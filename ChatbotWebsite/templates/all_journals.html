@@ -1,0 +1,141 @@
+{% extends 'layout.html' %}
+
+{% block style %}
+<style>
+    body {
+        background: linear-gradient(135deg, #fff5fb, #f9f0ff);
+        min-height: 100vh;
+    }
+
+    .card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(8px);
+        border-radius: 15px;
+        padding: 20px;
+    }
+
+    .card h4 a.text-info {
+        color: #7a4fff;
+    }
+
+    .btn-outline-secondary {
+        border-color: #d4b3ff;
+        color: #7a4fff;
+        transition: 0.3s;
+    }
+
+    .btn-outline-secondary:hover {
+        background-color: #e5d4ff;
+        color: #4c00ff;
+    }
+
+    .btn-info {
+        background-color: #7a4fff;
+        border-color: #7a4fff;
+        transition: 0.3s;
+    }
+
+    .btn-info:hover {
+        background-color: #5e36d1;
+        border-color: #5e36d1;
+    }
+
+    .pagination a.btn {
+        margin: 2px;
+    }
+
+    .text-truncate {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .logo-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .logo-header img {
+        width: 120px;
+        height: auto;
+    }
+</style>
+{% endblock style %}
+
+{% block content %}
+
+{% set mood_emojis = {
+    'happy': '😊 Happy',
+    'sad': '😢 Sad',
+    'angry': '😡 Angry',
+    'neutral': '😐 Neutral',
+    'excited': '🤩 Excited'
+} %}
+
+<div class="container-fluid py-5">
+
+    <!-- Header with Logo and Title -->
+    <div class="logo-header">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" alt="LUMORA Logo" class="img-fluid mb-3"/>
+        <h1 class="fw-bold font-monospace text-info border-bottom border-info pb-2">Lumora Journals</h1>
+        <p class="lead text-secondary text-center mx-auto" style="max-width: 600px;">
+    Track your thoughts and moods. Your personal space for reflection and wellbeing.
+        </p>
+        <a class="btn btn-info btn-lg mt-3 shadow" href="{{ url_for('journals.new_journal') }}">
+            Add New Journal
+        </a>
+    </div>
+
+    <!-- Pagination -->
+    <div class="d-flex justify-content-center mb-4 flex-wrap gap-2">
+        {% for page_num in journals.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=1) %}
+            {% if page_num %}
+                {% if journals.page == page_num %}
+                    <a href="{{ url_for('journals.all_journals', page=page_num) }}" class="btn btn-secondary">{{ page_num }}</a>
+                {% else %}
+                    <a href="{{ url_for('journals.all_journals', page=page_num) }}" class="btn btn-outline-secondary">{{ page_num }}</a>
+                {% endif %}
+            {% else %}
+                <span class="mx-2">...</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Journals List -->
+    <div class="row row-cols-1 row-cols-md-2 g-4 justify-content-center">
+        {% for journal in journals.items %}
+            <div class="col d-flex justify-content-center">
+                <div class="card shadow-sm border-info w-100" style="max-width: 600px;">
+                    <div class="card-body">
+                        <h4 class="card-title mb-2">
+                            Feeling 
+                            <a href="{{ url_for('journals.journal', journal_id=journal.id) }}" class="text-info text-decoration-none">
+                                {{ mood_emojis[journal.mood] }}
+                            </a> 
+                            on {{ journal.timestamp.strftime('%d.%m.%Y') }}
+                        </h4>
+                        <p class="text-truncate mb-3">{{ journal.content }}</p>
+                        <hr>
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <img src="{{ url_for('static', filename='profile_images/' + current_user.profile_image) }}" 
+                                     alt="profile-avatar" class="img-fluid rounded-circle me-3" width="50">
+                                <div>
+                                    <p class="mb-0 fw-semibold">{{ journal.user.username }}</p>
+                                    <small class="text-muted">Created on {{ journal.timestamp.strftime('%d/%m/%Y, %A, %H:%M') }}</small>
+                                </div>
+                            </div>
+                            <a href="{{ url_for('journals.journal', journal_id=journal.id) }}" class="btn btn-outline-secondary">
+                                View
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+{% endblock content %}

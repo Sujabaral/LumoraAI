@@ -1,0 +1,137 @@
+{% extends "layout.html" %}
+
+{% block style %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/evaluation.css') }}">
+{% endblock style %}
+
+{% block content %}
+<div class="eval-page">
+  <div class="eval-container">
+
+    <div class="eval-top">
+      <div class="eval-title">
+        <h1>J2: User Feedback Evaluation</h1>
+        <p>
+          This section evaluates usability and perceived helpfulness of Lumora based on user feedback
+          (rating + helpfulness). Feedback is collected per chat session to reduce repeated responses and bias.
+        </p>
+      </div>
+      <div class="badge">
+        <strong>Total Responses:</strong> {{ stats.total }}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Key Feedback KPIs</h2>
+      <p class="meta">These numbers support subjective evaluation in the report.</p>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Average Rating</div>
+          <div class="value">{{ stats.avg_rating if stats.avg_rating is not none else "—" }}</div>
+          <div class="sub">Mean of 1–5 star ratings</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Helpful (Yes)</div>
+          <div class="value">{{ stats.helpful_yes }}</div>
+          <div class="sub">Users who marked the chatbot as helpful</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Helpful Rate</div>
+          <div class="value">{{ (stats.helpful_pct ~ "%") if stats.helpful_pct is not none else "—" }}</div>
+          <div class="sub">Helpful Yes / Total</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid two" style="margin-top:16px;">
+      <div class="card">
+        <h2>Ratings Distribution</h2>
+        <p class="meta">Shows how users rated Lumora overall.</p>
+
+        <!-- ✅ wrapper forces chart to stay inside card -->
+        <div class="chart-wrap">
+          <img class="eval-img" src="{{ url_for('chatbot.j2_ratings_chart') }}" alt="ratings chart">
+        </div>
+
+        <p class="note">Higher ratings generally indicate better perceived usability and response quality.</p>
+      </div>
+
+      <div class="card">
+        <h2>Helpfulness Split</h2>
+        <p class="meta">Proportion of users who found the chatbot helpful.</p>
+
+        <!-- ✅ wrapper forces chart to stay inside card -->
+        <div class="chart-wrap">
+          <img class="eval-img" src="{{ url_for('chatbot.j2_helpful_chart') }}" alt="helpful chart">
+        </div>
+
+        <p class="note">This is subjective feedback and complements objective metrics (J1).</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>Per-Session Feedback Summary</h2>
+      <p class="meta">
+        Feedback is grouped by chat session to evaluate whether certain conversations perform better or worse.
+      </p>
+
+      {% if per_session and per_session|length > 0 %}
+        <div class="table-responsive">
+          <table class="table table-sm table-striped align-middle">
+            <thead>
+              <tr>
+                <th>Session</th>
+                <th>Responses</th>
+                <th>Avg Rating</th>
+                <th>Helpful Yes</th>
+                <th>Helpful No</th>
+                <th>Last Feedback</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in per_session %}
+              <tr>
+                <td>{{ r.title or ("Session #" ~ r.session_id) }}</td>
+                <td>{{ r.n }}</td>
+                <td>{{ ("%.2f"|format(r.avg_rating)) if r.avg_rating is not none else "—" }}</td>
+                <td>{{ r.yes }}</td>
+                <td>{{ r.no }}</td>
+                <td>
+                  {% if r.last_feedback_at %}
+                    {{ r.last_feedback_at.strftime('%d/%m/%Y, %H:%M') if r.last_feedback_at.__class__.__name__ == 'datetime' else r.last_feedback_at }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="note">No feedback submitted yet. Submit feedback from the Chat page after a session.</p>
+      {% endif %}
+    </div>
+    <p class="note">
+  Helpful rate = {{ stats.helpful_pct }}%
+  {% if stats.ci_lo is not none %}
+    · 95% CI (Wilson) = [{{ stats.ci_lo }}%, {{ stats.ci_hi }}%]
+  {% endif %}
+</p>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>Academic Justification (Why this feedback design?)</h2>
+      <p class="note">
+        A short post-session survey is a common evaluation approach in human-computer interaction because it captures
+        perceived usefulness, user satisfaction, and trust. Lumora collects feedback once per session to avoid repeated
+        answers from the same user and to keep evaluation consistent. The confidence-based trigger reduces interruptions:
+        users are asked for feedback only after the chatbot produces sufficiently confident predictions and the session
+        includes enough turns to form a meaningful opinion. This provides a balanced subjective evaluation alongside the
+        objective sentiment performance reported in J1.
+      </p>
+    </div>
+
+  </div>
+</div>
+{% endblock content %}

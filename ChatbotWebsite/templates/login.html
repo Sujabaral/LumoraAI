@@ -1,0 +1,135 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<style>
+
+  .login-container {
+    min-height: 100vh;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 22px;
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+  }
+
+  .form-control,
+  .form-check-input {
+    background: rgba(255, 255, 255, 0.85) !important;
+    color: #3a0066 !important;
+  }
+
+  label, .nav-link, h3, a, small {
+    color: #3a0066 !important;
+  }
+
+  .input-group-text {
+    background: rgba(255, 255, 255, 0.75);
+    border: none;
+    color: #3a0066;
+  }
+
+  .btn-lumora {
+    background: linear-gradient(135deg, #b478ff, #8857ff);
+    border: none;
+    color: white;
+    font-weight: 600;
+    transition: 0.3s;
+  }
+
+  .btn-lumora:hover {
+    transform: scale(1.03);
+    opacity: 0.95;
+  }
+
+  /* Make text more visible on mobile */
+  @media (max-width: 576px) {
+    h3 {
+      font-size: 1.3rem;
+    }
+  }
+
+</style>
+
+
+<div class="container login-container d-flex align-items-center">
+  <div class="row justify-content-center w-100">
+
+    <!-- Left Side Image (Hidden on small screens) -->
+    <div class="col-lg-6 d-none d-lg-flex justify-content-center align-items-center">
+      <img src="{{ url_for('static', filename='images/login.jpg') }}"
+           alt="Login"
+           class="img-fluid rounded shadow-lg"
+           style="max-height: 450px; object-fit: cover;">
+    </div>
+
+    <!-- Login Form -->
+    <div class="col-lg-4 col-md-8 col-11">
+      <div class="glass-card p-4 shadow-lg">
+
+        <!-- Logo -->
+        <div class="text-center mb-2">
+          <img src="{{ url_for('static', filename='images/logo.png') }}"
+               style="max-height: 80px;"
+               class="img-fluid">
+        </div>
+
+        <h3 class="text-center fw-bold mb-4">
+          Welcome Back 💜
+        </h3>
+
+        <form method="POST" action="">
+          {{ form.hidden_tag() }}
+
+          <!-- Email -->
+          <div class="input-group mb-3">
+            <span class="input-group-text"><i class="bi bi-envelope-fill"></i></span>
+          {{ form.username(class="form-control", placeholder="Username or Email") }}
+           </div>
+
+          <!-- Password -->
+          <div class="input-group mb-3">
+            <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+            {{ form.password(class="form-control", placeholder="Password") }}
+          </div>
+
+          <!-- Remember Me -->
+          <div class="form-check mb-3">
+            {{ form.remember_me(class="form-check-input") }}
+            {{ form.remember_me.label(class="form-check-label") }}
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" class="btn btn-lumora w-100 py-2">
+            Log In
+          </button>
+
+          <!-- Forgot Password -->
+          <div class="text-center mt-3">
+            <a href="{{ url_for('users.reset_request') }}"
+               class="text-decoration-none">
+              Forgot Password?
+            </a>
+          </div>
+
+        </form>
+
+        <hr>
+
+        <div class="text-center">
+          <small>
+            New to Lumora?
+            <a href="{{ url_for('users.register') }}" class="fw-bold text-decoration-none">
+              Create Account
+            </a>
+          </small>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock content %}

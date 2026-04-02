@@ -1,0 +1,242 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/evaluation.css') }}">
+
+<div class="eval-page">
+  <div class="eval-container">
+
+    <!-- Header -->
+    <div class="eval-top">
+      <div class="eval-title">
+        <h1>Manual Labeling (Ground Truth)</h1>
+        <p>
+          Label user messages as <b>negative</b>, <b>neutral</b>, or <b>positive</b>.
+          These labels are used as <b>ground truth</b> for J1 evaluation.
+        </p>
+      </div>
+
+      <div class="badge">
+        <strong>Labeled so far:</strong> {{ total_labeled }}
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="card">
+      <h2>Controls</h2>
+
+      <!-- GET controls (safe) -->
+      <form method="GET" action="{{ url_for('chatbot.label_messages_page') }}"
+            style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+
+        {% if dataset %}
+          <input type="hidden" name="dataset_id" value="{{ dataset.id }}">
+        {% elif dataset_id %}
+          <input type="hidden" name="dataset_id" value="{{ dataset_id }}">
+        {% endif %}
+
+        <label class="badge">
+          Limit:
+          <input name="limit" type="number" min="10" max="200" value="{{ limit }}"
+                 style="width:80px; border:none; background:transparent;">
+        </label>
+
+        <label class="badge">
+          <input type="checkbox" name="only_unlabeled" value="1"
+                 {% if only_unlabeled %}checked{% endif %}>
+          Only unlabeled
+        </label>
+
+        <button type="submit" class="badge">Refresh</button>
+      </form>
+
+      <hr style="margin:14px 0; opacity:.25;">
+
+      <!-- Dataset creation (NOT a form) -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input id="dataset_name" class="badge" placeholder="Dataset name (e.g., J1 Set)"
+               style="min-width:220px; padding:10px;">
+
+        <input id="dataset_n" type="number" class="badge" value="90"
+               min="15" max="1000" style="width:120px; padding:10px;">
+
+        <label class="badge">
+          <input type="checkbox" id="freeze_now"> Freeze now
+        </label>
+
+        <!-- IMPORTANT: type="button" -->
+        <button type="button" class="badge" style="cursor:pointer;"
+                onclick="createBalancedDataset(event)">
+          Create Balanced Dataset
+        </button>
+      </div>
+
+      <!-- Dataset status -->
+      {% if dataset %}
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <span class="badge">
+            <strong>Dataset:</strong> {{ dataset.name }} (ID: {{ dataset.id }})
+            {% if dataset.is_frozen %} • Frozen{% endif %}
+          </span>
+
+          <a class="badge"
+             href="{{ url_for('chatbot.label_messages_page',
+                              dataset_id=dataset.id,
+                              limit=limit,
+                              only_unlabeled=1 if only_unlabeled else 0) }}">
+            Reload Dataset
+          </a>
+
+          <a class="badge"
+             href="{{ url_for('chatbot.export_eval_dataset_csv', dataset_id=dataset.id) }}">
+            Export CSV
+          </a>
+
+          {% if not dataset.is_frozen %}
+            <form method="POST" action="{{ url_for('chatbot.freeze_eval_dataset', dataset_id=dataset.id) }}">
+              <button class="badge" type="submit" style="cursor:pointer;">Freeze Dataset</button>
+            </form>
+          {% else %}
+            <form method="POST" action="{{ url_for('chatbot.unfreeze_eval_dataset', dataset_id=dataset.id) }}">
+              <button class="badge" type="submit" style="cursor:pointer;">Unfreeze</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Messages -->
+    <div class="card" style="margin-top:16px;">
+      <h2>Messages</h2>
+
+      {% if not rows %}
+        <p>No messages available.</p>
+      {% else %}
+        <table class="table">
+          <tr>
+            <th style="width:160px;">Time</th>
+            <th>Message</th>
+            <th style="width:320px;">Human Label</th>
+          </tr>
+
+          {% for r in rows %}
+          <tr id="row-{{ r.id }}">
+            <td>{{ r.timestamp.strftime("%Y-%m-%d %H:%M") if r.timestamp else "" }}</td>
+            <td style="white-space:pre-wrap;">{{ r.content }}</td>
+            <td>
+              <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                <!-- IMPORTANT: type="button" so it never submits anything -->
+                <button type="button" class="badge" onclick="saveLabel({{ r.id }}, 'negative')">Negative</button>
+                <button type="button" class="badge" onclick="saveLabel({{ r.id }}, 'neutral')">Neutral</button>
+                <button type="button" class="badge" onclick="saveLabel({{ r.id }}, 'positive')">Positive</button>
+
+                <span class="badge" id="status-{{ r.id }}">
+                  Current: {{ r.human_label if r.human_label else "—" }}
+                </span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ---------------------------
+   SAVE HUMAN LABEL (JSON)
+---------------------------- */
+async function saveLabel(id, label) {
+  const status = document.getElementById(`status-${id}`);
+
+  try {
+    const res = await fetch("{{ url_for('chatbot.save_label') }}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({ id: Number(id), label: label })
+    });
+
+    const ct = res.headers.get("content-type") || "";
+    const text = await res.text();
+
+    let data = null;
+    if (ct.includes("application/json")) {
+      data = JSON.parse(text);
+    } else {
+      status.textContent = "Error: Server returned non-JSON (HTTP " + res.status + ")";
+      return;
+    }
+
+    if (!res.ok || !data || !data.ok) {
+      status.textContent = "Error: " + (data.error || ("HTTP " + res.status));
+      return;
+    }
+
+    status.textContent = "Current: " + data.human_label;
+
+  } catch (err) {
+    status.textContent = "Error: " + (err.message || "failed");
+  }
+}
+
+/* ---------------------------
+   CREATE DATASET (FormData)
+---------------------------- */
+async function createBalancedDataset(ev) {
+  if (ev) ev.preventDefault();
+
+  const name = (document.getElementById("dataset_name").value || "").trim() || "J1 Ground Truth Set";
+  const n = document.getElementById("dataset_n").value || 90;
+  const freeze = document.getElementById("freeze_now").checked ? "1" : "0";
+
+  const form = new FormData();
+  form.append("name", name);
+  form.append("n", n);
+  form.append("balanced", "1");
+  form.append("freeze_now", freeze);
+  form.append("note", "Manual sentiment labels for J1 evaluation");
+
+  const res = await fetch("{{ url_for('chatbot.create_eval_dataset') }}", {
+    method: "POST",
+    body: form
+  });
+
+  const ct = res.headers.get("content-type") || "";
+  const text = await res.text();
+
+  if (!ct.includes("application/json")) {
+    alert("Server returned non-JSON (HTTP " + res.status + "):\n" + text.slice(0, 250));
+    return;
+  }
+
+  const data = JSON.parse(text);
+
+  if (!res.ok || !data.ok) {
+    alert("Error: " + (data.error || ("HTTP " + res.status)));
+    return;
+  }
+
+  alert(
+    `Dataset created ✅\n` +
+    `Name: ${data.name}\n` +
+    `Added: ${data.added}\n` +
+    `Counts: neg=${data.class_counts.negative}, neu=${data.class_counts.neutral}, pos=${data.class_counts.positive}\n` +
+    `Frozen: ${data.is_frozen}`
+  );
+
+  // IMPORTANT: backend returns dataset_id (not id)
+  if (data.dataset_id) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("dataset_id", data.dataset_id);
+    window.location.href = url.toString();
+  } else {
+    window.location.reload();
+  }
+}
+</script>
+{% endblock content %}

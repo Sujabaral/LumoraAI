@@ -1,0 +1,252 @@
+{% extends "layout.html" %}
+
+{% block style %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/evaluation.css') }}">
+<style>
+  /* Ensure images scale correctly */
+  .eval-img {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 900px) {
+    .kpis { grid-template-columns: 1fr; }
+  }
+
+  /* Academic callouts */
+  .callout {
+    background: rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-left: 4px solid rgba(0,0,0,0.25);
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-top: 10px;
+  }
+  .callout p { margin: 0; }
+
+  /* Threats layout */
+  .threats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+  }
+  @media (max-width: 900px) {
+    .threats { grid-template-columns: 1fr; }
+  }
+
+  .threat {
+    background: rgba(0,0,0,0.02);
+    border: 1px solid rgba(0,0,0,0.07);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .threat h3 {
+    margin: 0 0 6px 0;
+    font-size: 1.02rem;
+  }
+</style>
+{% endblock style %}
+
+{% block content %}
+<div class="eval-page">
+  <div class="eval-container">
+
+    <!-- Title -->
+    <div class="eval-top">
+      <div class="eval-title">
+        <h1>J1: Sentiment Model Evaluation</h1>
+        <p>
+          This evaluation compares sentiment prediction using three approaches:
+          <b>VADER</b> (lexicon-based), <b>ML</b> (supervised classifier), and a
+          <b>Hybrid</b> method combining both.
+        </p>
+      </div>
+
+      <div class="badge">
+        <strong>Metric:</strong> {{ meta.metric if meta else "Macro-F1" }}
+        {% if (meta and meta.labels) or (results and results.labels) %}
+          · <span>Labels: {{ (meta.labels if meta else results.labels) | join(", ") }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="card">
+      <h2>Summary Metrics</h2>
+      <p class="meta">
+        Macro-F1 ranges from 0 to 1 and averages F1 across all sentiment classes,
+        making it suitable for imbalanced datasets.
+      </p>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Macro-F1 (VADER)</div>
+          <div class="value">{{ '%.2f'|format(results.f1.vader) }}</div>
+          <div class="sub">Lexicon-based baseline.</div>
+        </div>
+
+        <div class="kpi">
+          <div class="label">Macro-F1 (ML)</div>
+          <div class="value">{{ '%.2f'|format(results.f1.ml) }}</div>
+          <div class="sub">Supervised classifier.</div>
+        </div>
+
+        <div class="kpi">
+          <div class="label">Macro-F1 (Hybrid)</div>
+          <div class="value">{{ '%.2f'|format(results.f1.hybrid) }}</div>
+          <div class="sub">ML + rule-based adjustments.</div>
+        </div>
+      </div>
+
+      <p class="note">
+        Evaluation is performed on human-labeled chat messages.
+      </p>
+    </div>
+
+    <!-- Charts -->
+    <!-- Charts -->
+<div class="grid two" style="margin-top:16px;">
+
+  <!-- F1 Chart -->
+  <div class="card">
+    <h2>Macro-F1 Comparison</h2>
+    <p class="meta">
+      Comparison of sentiment approaches using Macro-F1.
+    </p>
+
+    <img class="eval-img"
+         src="{{ url_for('chatbot.j1_f1_chart') }}?v={{ results.f1.vader }}"
+         alt="Macro-F1 comparison chart">
+
+    <div class="callout">
+      <p>
+        <strong>Interpretation:</strong>
+        Macro-F1 evaluates each sentiment class equally, preventing dominant
+        classes from skewing results. This is important for conversational
+        mental health data.
+      </p>
+    </div>
+  </div>
+
+  <!-- Confusion Matrix -->
+  <div class="card">
+    <h2>Confusion Matrix (Hybrid)</h2>
+    <p class="meta">
+      Rows represent actual labels; columns represent predicted labels.
+    </p>
+
+    <img class="eval-img"
+         src="{{ url_for('chatbot.j1_confusion_chart') }}?v={{ results.f1.hybrid }}"
+         alt="Confusion matrix for hybrid model">
+
+    <div class="callout">
+      <p>
+        <strong>Interpretation:</strong>
+        Diagonal cells indicate correct predictions, while off-diagonal cells
+        represent misclassifications (mostly between negative and neutral).
+        {% if results.meta.distribution.positive == 0 %}
+          The positive class is absent in the evaluation dataset; therefore,
+          no positive predictions appear.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+</div>
+
+    <!-- Dataset Statistics -->
+    {% if results and results.meta %}
+    <div class="card" style="margin-top:16px;">
+      <h2>Dataset Statistics</h2>
+      <p class="meta">{{ results.meta.ground_truth }}</p>
+
+      <table class="table">
+        <tr><th>Total labeled samples</th><td>{{ results.meta.n_samples }}</td></tr>
+        <tr><th>Negative</th><td>{{ results.meta.distribution.negative }}</td></tr>
+        <tr><th>Neutral</th><td>{{ results.meta.distribution.neutral }}</td></tr>
+        <tr><th>Positive</th><td>{{ results.meta.distribution.positive }}</td></tr>
+        <tr><th>Note</th><td>{{ results.meta.note }}</td></tr>
+      </table>
+    </div>
+    {% endif %}
+
+    <!-- Methodology -->
+    <div class="card" style="margin-top:16px;">
+      <h2>Methodology</h2>
+      <table class="table">
+        <tr><th>Component</th><th>Description</th><th>Purpose</th></tr>
+        <tr>
+          <td>VADER</td>
+          <td>Rule-based sentiment analyzer</td>
+          <td>Transparent baseline</td>
+        </tr>
+        <tr>
+          <td>ML</td>
+          <td>Supervised learning model</td>
+          <td>Pattern learning from data</td>
+        </tr>
+        <tr>
+          <td>Hybrid</td>
+          <td>ML + heuristics</td>
+          <td>Improved robustness on short messages</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Threats to Validity -->
+    <div class="card" style="margin-top:16px;">
+      <h2>Threats to Validity</h2>
+      <p class="meta">
+        Factors that may limit generalization of these results.
+      </p>
+
+      <div class="threats">
+        <div class="threat">
+          <h3>1) Small Dataset</h3>
+          <p class="meta">
+            Limited labeled samples may cause metric instability.
+          </p>
+        </div>
+
+        <div class="threat">
+          <h3>2) Class Imbalance</h3>
+          <p class="meta">
+            Uneven sentiment distribution affects Macro-F1 and confusion matrices.
+          </p>
+        </div>
+
+        <div class="threat">
+          <h3>3) Labeling Subjectivity</h3>
+          <p class="meta">
+            Human interpretation of emotional text can vary.
+          </p>
+        </div>
+
+        <div class="threat">
+          <h3>4) Domain Specificity</h3>
+          <p class="meta">
+            Results are specific to mental health chatbot conversations.
+          </p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:12px;">
+        <p>
+          <strong>Mitigation:</strong>
+          Increase labeled data, balance sentiment classes, and evaluate across
+          multiple users and sessions.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock content %}

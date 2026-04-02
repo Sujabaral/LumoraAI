@@ -1,0 +1,494 @@
+{% extends 'layout.html' %}
+
+{% block style %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/chat.css') }}" />
+{% endblock style %}
+
+{% block content %}
+<div id="chatbot" class="chatbot">
+
+  <!-- LEFT: Chatbot Profile -->
+  <div id="chatbot-profile" class="chatbot-profile">
+    <img
+      src="{{ url_for('static', filename='images/logo.png') }}"
+      id="chatbot-image"
+      class="rounded-circle border border-secondary my-4 mx-auto d-block"
+      style="width: 15.625rem; height: 15.625rem"
+    />
+    <div class="container d-grid gap-3 px-5">
+
+      <!-- ✅ Language Toggle Buttons (TOP) -->
+      <div class="d-flex gap-2 mb-3 align-items-center justify-content-center flex-wrap">
+        <span class="me-2"><b>{{ t("language", lang) }}:</b></span>
+
+        <button class="btn btn-sm btn-outline-primary" type="button" onclick="setLang('en')">
+          {{ t("english", lang) }}
+        </button>
+        <button class="btn btn-sm btn-outline-primary" type="button" onclick="setLang('ne')">
+          {{ t("nepali", lang) }}
+        </button>
+      </div>
+
+      <a class="btn btn-outline-info btn-lg" href="{{ url_for('main.about') }}">About us 🤖</a>
+
+      <button type="button" class="btn btn-lg btn-info"
+        data-bs-toggle="popover"
+        data-bs-title="Help"
+        data-bs-placement="top"
+        data-bs-content="Start the conversation by typing a greeting or ask a question (E.g. What is Mental Health, causes of depression). You can also select a specific topic, test, or exercise through the tab above the text input box. Avoid typos as this chatbot has built-in autocorrect.">
+        ❓ Need Help?
+      </button>
+
+      <button type="button" class="btn btn-lg btn-info"
+        data-bs-toggle="popover"
+        data-bs-title="Subjects"
+        data-bs-placement="bottom"
+        data-bs-content="I talk about: Mental Health, Addiction, Anxiety, Depression, Disorders, Feelings, Loneliness, Medication, Meditation, Mindfulness, Personal growth, Phobia, Self-care, Sleep, Stress, Suicide, Trauma, and more.">
+        📚 Subjects
+      </button>
+
+      <div class="text-center mt-2 text-muted">
+        Developed by Team LUMORA | <strong>LUMORA: Mental Health Chatbot</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: Chat Area -->
+  <div class="chat-area">
+    <main id="main-chat" class="main-chat">
+
+      {% if messages %}
+        {% for m in messages %}
+          {% set role = (m.role if m.role is defined else m.get('role')) %}
+          {% set ts = (m.timestamp if m.timestamp is defined else m.get('timestamp')) %}
+
+          {% if role in ['user', 'User'] %}
+            {% set content = (m.user_text_raw if m.user_text_raw is defined and m.user_text_raw else (m.content if m.content is defined else m.get('content'))) %}
+          {% else %}
+            {% set content = (m.bot_text_local if m.bot_text_local is defined and m.bot_text_local else (m.content if m.content is defined else m.get('content'))) %}
+          {% endif %}
+
+          {% if role in ['user', 'User'] %}
+            <div class="chat right-msg">
+              <img
+                src="{{ url_for('static', filename='profile_images/' + (current_user.profile_image if current_user.is_authenticated else 'default.jpg')) }}"
+                class="chat-image"
+              />
+              <div class="chat-bubble">
+                <div class="chat-info">
+                  <div class="chat-info-name">You</div>
+                  <div class="chat-info-time">
+                    {% if ts %}
+                      {% if ts.__class__.__name__ == 'datetime' %}
+                        {{ ts.strftime('%d/%m/%Y, %H:%M') }}
+                      {% else %}
+                        {{ ts }}
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="chat-text">{{ content }}</div>
+
+                <div class="mt-2 d-flex gap-2 justify-content-end flex-wrap">
+                  <button class="btn btn-sm btn-outline-secondary"
+                          type="button"
+                          onclick="showExplain({{ m.id }})">
+                    {{ t("why", lang) }}
+                  </button>
+                </div>
+
+                {% if m.crisis_mode %}
+                  <div class="alert alert-danger mt-2">
+                    <strong>{{ t("crisis_title", lang) }}</strong><br>
+                    <pre style="white-space:pre-wrap;">{{ t("crisis_msg", lang) }}</pre>
+                    <small>{{ t("translation_note", lang) }}</small>
+                  </div>
+                {% endif %}
+
+              </div>
+            </div>
+          {% else %}
+            <div class="chat left-msg">
+              <img src="{{ url_for('static', filename='images/logo.png') }}" class="chat-image"/>
+              <div class="chat-bubble">
+                <div class="chat-info">
+                  <div class="chat-info-name">LUMORA: MENTAL HEALTH CHATBOT</div>
+                  <div class="chat-info-time">
+                    {% if ts %}
+                      {% if ts.__class__.__name__ == 'datetime' %}
+                        {{ ts.strftime('%d/%m/%Y, %H:%M') }}
+                      {% else %}
+                        {{ ts }}
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="chat-text">{{ content }}</div>
+
+                <div class="mt-2 d-flex gap-2 justify-content-start flex-wrap">
+                  <button class="btn btn-sm btn-outline-secondary"
+                          type="button"
+                          onclick="showExplain({{ m.id }})">
+                    {{ t("why", lang) }}
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+        <hr>
+      {% endif %}
+
+      {% if not messages %}
+        <p class="text-muted text-center mb-2">Today</p>
+        <div class="chat left-msg">
+          <img src="{{ url_for('static', filename='images/logo.png') }}" class="chat-image"/>
+          <div class="chat-bubble">
+            <div class="chat-info">
+              <div class="chat-info-name">LUMORA: Mental Health Chatbot</div>
+              <div class="chat-info-time">**:**</div>
+            </div>
+
+            {% if current_user.is_authenticated %}
+              <div class="chat-text">
+                Please understand that this is a chatbot and not a real person. It is not a substitute for professional help.<br><br>
+                Always best to seek professional help if you are in need of it.<br><br>
+                Hi {{ current_user.username }}, welcome back to LUMORA! Go ahead and send me a message. 😄
+              </div>
+            {% else %}
+              <div class="chat-text">
+                Hello, welcome to LUMORA: Mental Health Chatbot! Go ahead and send me a message. 😄<br><br>
+                Please understand that this is a chatbot and not a real person. It is not a substitute for professional help.<br><br>
+                Always best to seek professional help if you are in need of it.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
+    </main>
+
+    <!-- ✅ Mindfulness Player -->
+    <div id="mindfulnessPlayer" class="p-2" style="display:none;">
+      <div class="alert alert-success mb-2">
+        <b id="mindfulnessTitle"></b><br>
+        <small id="mindfulnessDesc"></small>
+      </div>
+
+      <audio id="mindfulnessAudio" controls preload="auto" style="width:100%;">
+        <source id="mindfulnessSource" src="" type="audio/mpeg">
+        Your browser does not support audio.
+      </audio>
+    </div>
+
+    <!-- Tools Dropdown -->
+    <div class="tools border-top border-info gap-3">
+      <div class="btn-group dropup">
+        <button class="btn btn-outline-info dropdown-toggle" data-bs-toggle="dropdown">Topics 📜</button>
+        <ul class="dropdown-menu">
+          {% for topic in topics.topics %}
+            <li><button class="dropdown-item" onclick="responseTopic('{{ topic.title }}')">{{ topic.title }}</button></li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="btn-group dropup">
+        <button class="btn btn-outline-info dropdown-toggle" data-bs-toggle="dropdown">Tests 📝</button>
+        <ul class="dropdown-menu">
+          {% for test in tests.tests %}
+            <li><button class="dropdown-item" onclick="responseTest('{{ test.title }}')">{{ test.title }}</button></li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="btn-group dropup">
+        <button class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">Mindfulness 🎧</button>
+        <ul class="dropdown-menu">
+          {% for exercise in mindfulness_exercises.mindfulness_exercises %}
+            <li><button class="dropdown-item" onclick="responseExercise('{{ exercise.title }}')">{{ exercise.title }}</button></li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Chat Input Form -->
+    <form
+      id="message-form"
+      class="chat-inputarea"
+      image_file="{{ current_user.profile_image if current_user.is_authenticated else 'default.jpg' }}"
+      data-session-id="{{ active_session_id if not is_guest else '' }}"
+      data-is-guest="{{ '1' if is_guest else '0' }}"
+    >
+      <input type="text" class="chat-input" id="textInput" autocomplete="off" placeholder="Enter your message..." />
+      <button type="submit" class="btn btn-outline-info">Send</button>
+    </form>
+
+    {# =========================================================
+       ✅ FEEDBACK CARD (FIXED): count ONLY USER turns
+       ========================================================= #}
+
+    {% if not is_guest %}
+
+      {# ✅ count only user messages #}
+      {% set user_count = (messages | selectattr("role", "equalto", "user") | list | length) %}
+      {% set min_user_turns = 3 %}
+
+      {# (optional debug - remove later) #}
+      {# <div class="text-muted small mt-2">debug: already={{ already_feedback }} user_count={{ user_count }} session={{ active_session_id }}</div> #}
+
+      {% if (not already_feedback) and (user_count >= min_user_turns) %}
+
+        <div class="card mt-3 shadow-sm border-info">
+          <div class="card-body">
+            <h5 class="card-title mb-2">Chat Feedback</h5>
+            <p class="text-muted mb-3" style="font-size:.92rem;">
+              This helps us evaluate response quality for this chat session.
+            </p>
+
+            <form method="POST" action="{{ url_for('chatbot.submit_feedback') }}">
+              <input type="hidden" name="session_id" value="{{ active_session_id }}">
+
+              <div class="mb-2">
+                <label class="form-label mb-1">Rating (1–5)</label><br>
+                {% for i in range(1,6) %}
+                  <label class="me-2">
+                    <input type="radio" name="rating" value="{{ i }}" required> {{ i }}
+                  </label>
+                {% endfor %}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label mb-1">Was this helpful?</label><br>
+                <label class="me-3"><input type="radio" name="helpful" value="yes" required> Yes</label>
+                <label><input type="radio" name="helpful" value="no" required> No</label>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label mb-1">Comments (optional)</label>
+                <textarea class="form-control" name="comments" rows="2"
+                          maxlength="1000"
+                          placeholder="What worked / what should improve?"></textarea>
+              </div>
+
+              <button class="btn btn-info" type="submit">Submit Feedback</button>
+            </form>
+          </div>
+        </div>
+
+      {% endif %}
+    {% endif %}
+
+  </div>
+
+  <!-- RIGHT: Your Chats Panel -->
+    <!-- RIGHT: Your Chats Panel -->
+  {% if not is_guest %}
+  <aside class="chat-right-panel">
+
+    <div class="right-header">
+      <div class="fw-bold">Your Chats</div>
+
+      <div class="d-flex align-items-center gap-2">
+        <form method="POST" action="{{ url_for('chatbot.new_session') }}" class="m-0">
+          <button type="submit" class="btn btn-sm btn-outline-info">+ New</button>
+        </form>
+
+        <!-- ✅ Search chats (client-side) -->
+        <input
+          id="chatSearchInput"
+          type="text"
+          class="form-control form-control-sm"
+          placeholder="Search…"
+          autocomplete="off"
+          style="width: 160px;"
+        />
+      </div>
+    </div>
+
+    <!-- ✅ THIS was missing; JS + CSS needs a scroll container -->
+    <div class="right-body" id="chatHistoryList">
+      {% if sessions %}
+        {% for s in sessions %}
+          <div class="session-row chat-history-item {% if s.id == active_session_id %}active{% endif %}"
+               data-title="{{ (s.title or '')|lower }}">
+
+            <a href="{{ url_for('chatbot.chat', session=s.id) }}"
+               class="session-item-link">
+              <div class="session-title">
+                {{ s.title if s.title else "New Chat" }}
+              </div>
+              <div class="session-meta">
+                {{ s.updated_at.strftime('%d/%m/%Y, %H:%M') if s.updated_at else '' }}
+              </div>
+            </a>
+
+            <!-- ✅ DELETE posts session_id -->
+            <form method="POST" action="{{ url_for('users.delete_conversation') }}" class="session-delete-form m-0">
+              <input type="hidden" name="session_id" value="{{ s.id }}">
+              <input type="hidden" name="next" value="chat">
+              <button type="submit"
+                      class="btn btn-sm btn-outline-danger session-delete-btn"
+                      onclick="return confirm('Delete this conversation?');"
+                      title="Delete">
+                🗑
+              </button>
+            </form>
+
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-muted small p-2">No chats yet.</div>
+      {% endif %}
+
+      <!-- ✅ No matches message -->
+      <div id="noChatsFound" class="text-muted small p-2" style="display:none;">
+        No chats found.
+      </div>
+    </div>
+
+    <div class="right-footer text-muted small">
+      Chats are saved only for logged-in users.
+    </div>
+
+  </aside>
+  {% endif %}
+
+  <script>
+  (function () {
+    "use strict";
+
+    const input = document.getElementById("chatSearchInput");
+    const list = document.querySelector(".chat-right-panel .right-body");
+    const empty = document.getElementById("noChatsFound");
+
+    if (!input || !list) return;
+
+    function filterChats() {
+      const q = (input.value || "").trim().toLowerCase();
+      const rows = list.querySelectorAll(".session-row");
+      let visible = 0;
+
+      rows.forEach((row) => {
+        const title = (row.getAttribute("data-title") || "").trim();
+        const match = !q || title.includes(q);
+        row.style.display = match ? "" : "none";
+        if (match) visible++;
+      });
+
+      if (empty) empty.style.display = (q && visible === 0) ? "" : "none";
+    }
+
+    input.addEventListener("input", filterChats);
+  })();
+  </script>
+
+{% include "chat/send_function.html" %}
+
+<!-- ✅ Explainability Modal -->
+<div class="modal fade" id="xaiModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Explanation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <pre id="xaiBody" style="white-space:pre-wrap;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+  [...popoverTriggerList].forEach(el => new bootstrap.Popover(el));
+
+  async function setLang(lang){
+    try{
+      const res = await fetch("{{ url_for('chatbot.set_lang') }}", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({lang})
+      });
+      const data = await res.json();
+      if(data.ok){
+        location.reload();
+      }
+    }catch(e){
+      console.error("setLang failed", e);
+    }
+  }
+
+  async function showExplain(id){
+    try {
+      const res = await fetch(`/chat/explain/${id}`);
+      const data = await res.json();
+
+      document.getElementById("xaiBody").innerText =
+        `Label: ${data.label}\n` +
+        `Confidence: ${data.confidence}\n` +
+        `Final: ${data.final_score}\n` +
+        `Top tokens: ${(data.top_tokens || []).join(", ")}`;
+
+      new bootstrap.Modal(document.getElementById('xaiModal')).show();
+    } catch (e) {
+      document.getElementById("xaiBody").innerText = "Could not load explanation.";
+      new bootstrap.Modal(document.getElementById('xaiModal')).show();
+    }
+  }
+
+  // ✅ Mindfulness audio player
+  function handleMindfulness(actions){
+    if(!actions || !actions.audio_url) return;
+
+    const box   = document.getElementById("mindfulnessPlayer");
+    const audio = document.getElementById("mindfulnessAudio");
+    const srcEl = document.getElementById("mindfulnessSource");
+    const title = document.getElementById("mindfulnessTitle");
+    const desc  = document.getElementById("mindfulnessDesc");
+
+    if(!box || !audio){
+      console.error("Mindfulness player elements not found in DOM");
+      return;
+    }
+
+    if(title) title.textContent = actions.title || actions.audio_title || "Mindfulness Audio";
+    if(desc)  desc.textContent  = actions.duration ? `Duration: ${actions.duration}` : (actions.audio_desc || "");
+
+    audio.preload = "auto";
+    audio.src = actions.audio_url;
+    if(srcEl){ srcEl.src = actions.audio_url; }
+
+    audio.load();
+    box.style.display = "block";
+
+    const tryPlay = () => audio.play().catch((e)=>{
+      console.log("Play blocked (user gesture required):", e);
+    });
+
+    tryPlay();
+    box.onclick = () => { tryPlay(); };
+  }
+</script>
+<script>
+  function handleCrisisRedirect(data){
+    // ✅ safest: only redirect if backend explicitly says so
+    if (data && data.redirect_sos && data.risk_level === "high") {
+      window.location.href = "/sos";
+      return true;
+    }
+
+    // Optional fallback: if backend only sends actions
+    if (data && data.crisis && data.actions && data.actions.sos_url) {
+      window.location.href = data.actions.sos_url;
+      return true;
+    }
+
+    return false;
+  }
+</script>
+
+{% endblock content %}

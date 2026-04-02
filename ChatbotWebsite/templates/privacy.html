@@ -1,0 +1,180 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <h3 class="fw-bold m-0">Privacy & Data Controls</h3>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('users.account') }}">
+      Back to Account
+    </a>
+  </div>
+
+  <p class="text-muted mb-4">
+    Manage your stored data in LUMORA. These actions are permanent.
+  </p>
+
+  <!-- ROW 1 -->
+  <div class="row g-3">
+
+    <!-- Delete old chat messages -->
+    <div class="col-md-6">
+      <div class="card p-3 shadow-sm rounded-4 h-100">
+        <h5 class="fw-bold mb-1">Delete old chat messages</h5>
+        <div class="small text-muted mb-2">
+          Deletes chat sessions/messages older than the selected window.
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('chatbot.delete_chats_older_than') }}"
+              class="d-flex gap-2 align-items-center mt-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <select name="window" class="form-select" style="max-width:180px;">
+            <option value="1h">Last 1 hour</option>
+            <option value="1d">Last 1 day</option>
+            <option value="1w">Last 1 week</option>
+            <option value="1m" selected>Last 1 month</option>
+          </select>
+          <button class="btn btn-danger" type="submit"
+                  onclick="return confirm('Delete chats older than this window? This cannot be undone.')">
+            Delete
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete old mood logs -->
+    <div class="col-md-6">
+      <div class="card p-3 shadow-sm rounded-4 h-100">
+        <h5 class="fw-bold mb-1">Delete old mood logs</h5>
+        <div class="small text-muted mb-2">
+          Deletes mood logs older than the selected window.
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('chatbot.delete_moods_older_than') }}"
+              class="d-flex gap-2 align-items-center mt-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <select name="window" class="form-select" style="max-width:180px;">
+            <option value="1h">Last 1 hour</option>
+            <option value="1d">Last 1 day</option>
+            <option value="1w">Last 1 week</option>
+            <option value="1m" selected>Last 1 month</option>
+          </select>
+          <button class="btn btn-danger" type="submit"
+                  onclick="return confirm('Delete mood logs older than this window? This cannot be undone.')">
+            Delete
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete old journal entries -->
+    <div class="col-md-6">
+      <div class="card p-3 shadow-sm rounded-4 h-100">
+        <h5 class="fw-bold mb-1">Delete old journal entries</h5>
+        <div class="small text-muted mb-2">
+          Deletes journal entries older than the selected window.
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('chatbot.delete_journals_older_than') }}"
+              class="d-flex gap-2 align-items-center mt-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <select name="window" class="form-select" style="max-width:180px;">
+            <option value="1h">Last 1 hour</option>
+            <option value="1d">Last 1 day</option>
+            <option value="1w">Last 1 week</option>
+            <option value="1m" selected>Last 1 month</option>
+          </select>
+          <button class="btn btn-danger" type="submit"
+                  onclick="return confirm('Delete journal entries older than this window? This cannot be undone.')">
+            Delete
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Export data -->
+    <div class="col-md-6">
+      <div class="card p-3 shadow-sm rounded-4 h-100">
+        <h5 class="fw-bold mb-1">Export my data</h5>
+        <div class="small text-muted mb-2">
+          Downloads a PDF summary of your stored data.
+        </div>
+
+        <form method="POST" action="{{ url_for('chatbot.export_my_data') }}" class="mt-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-primary" type="submit">
+            Download PDF
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div> <!-- /ROW 1 -->
+
+  <hr class="my-4">
+
+  <!-- ROW 2 -->
+  <div class="row g-3">
+
+    <!-- Delete one conversation (session) -->
+    <div class="col-md-6">
+      <div class="card p-3 shadow-sm rounded-4 h-100">
+        <h5 class="fw-bold mb-1">Delete a conversation</h5>
+        <div class="small text-muted mb-2">
+          Permanently deletes the selected chat session and all its messages.
+        </div>
+
+        <form method="POST"
+              action="{{ url_for('users.delete_conversation') }}"
+              class="d-flex gap-2 align-items-center mt-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="account">
+
+          <select name="session_id" class="form-select">
+            {% if sessions %}
+              {% for s in sessions %}
+                <option value="{{ s.id }}">
+                  {{ s.title if s.title else "New Chat" }}
+                  {% if s.updated_at %} ({{ s.updated_at.strftime('%d/%m/%Y %H:%M') }}){% endif %}
+                </option>
+              {% endfor %}
+            {% else %}
+              <option value="">No chats found</option>
+            {% endif %}
+          </select>
+
+          <button class="btn btn-danger" type="submit"
+                  {% if not sessions %}disabled{% endif %}
+                  onclick="return confirm('Delete this conversation permanently? This cannot be undone.')">
+            Delete
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete all conversations -->
+    <div class="col-md-6">
+      <div class="card p-3 shadow-sm rounded-4 h-100 border-danger">
+        <h5 class="fw-bold mb-1 text-danger">Delete ALL conversations</h5>
+        <div class="small text-muted mb-2">
+          Permanently deletes all chat sessions and messages for your account.
+        </div>
+
+        <form method="POST" action="{{ url_for('users.delete_conversation') }}" class="mt-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="scope" value="all">
+          <input type="hidden" name="next" value="account">
+
+          <button class="btn btn-danger" type="submit"
+                  onclick="return confirm('Delete ALL conversations permanently? This cannot be undone.')">
+            Delete All
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div> <!-- /ROW 2 -->
+
+</div>
+{% endblock %}

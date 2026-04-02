@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mood Tracker</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg,#f3c8ff,#e7d2ff,#f8eaff);
+      min-height: 100vh;
+      padding-bottom: 50px;
+    }
+
+    h2 { font-weight: bold; margin-bottom: 20px; }
+
+    .card {
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      margin-top: 20px;
+      padding: 20px;
+    }
+
+    .low { color: #c0392b; font-weight: bold; }
+    .high { color: #27ae60; font-weight: bold; }
+    .neutral { color: #f39c12; font-weight: bold; }
+
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    #notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      display: none;
+      color: white;
+      z-index: 1050;
+      font-weight: bold;
+      animation: fadein 0.3s ease;
+    }
+
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .btn-range.active {
+      background: rgba(108, 92, 231, 0.12);
+      border-color: rgba(108, 92, 231, 0.5);
+      color: #3f2dbf;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+<div class="container mt-4">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div id="successMessage" class="alert alert-{{ category }}" role="alert">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="dashboard-header mb-3">
+    <h2>📊 Mood Dashboard</h2>
+    <div>
+      <a href="{{ url_for('main.home') }}" class="btn btn-outline-primary me-2">
+        <i class="bi bi-house-fill"></i> Home
+      </a>
+      <!-- ✅ FIX: mood_checkin is inside chatbot blueprint in your routes.py -->
+      <a href="{{ url_for('chatbot.mood_checkin') }}" class="btn btn-success me-2">
+        ➕ Add Mood
+      </a>
+      <a href="{{ url_for('chatbot.export_mood_pdf') }}" class="btn btn-outline-dark">
+        📄 Export PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="mb-3 d-flex gap-2 flex-wrap">
+    <button id="btnDaily" class="btn btn-outline-secondary btn-range" onclick="loadMood('daily')">Daily</button>
+    <button id="btnWeekly" class="btn btn-outline-secondary btn-range" onclick="loadMood('weekly')">Weekly</button>
+    <button id="btnMonthly" class="btn btn-outline-secondary btn-range" onclick="loadMood('monthly')">Monthly</button>
+  </div>
+
+  <!-- Mood Chart -->
+  <div class="card">
+    <canvas id="moodChart" height="120"></canvas>
+    <div id="moodEmpty" class="text-muted small mt-2" style="display:none;">
+      Add a few mood check-ins or journal entries to see your trend.
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="card mt-4">
+    <h5>📈 Stats</h5>
+    <p id="statsText">Loading...</p>
+    <p id="streakText"></p>
+    <small class="text-muted">
+      * Daily/Weekly/Monthly values are averages. Journal moods are mapped to the same 1–5 scale.
+    </small>
+  </div>
+
+  <!-- Insight -->
+  <div class="card mt-4">
+    <h5>🧠 Mood Insight</h5>
+    <p id="sentimentText">Analyzing mood history...</p>
+  </div>
+
+  <!-- Suggestions -->
+  <div class="card mt-4">
+    <h5>💡 Suggestions</h5>
+    <p id="suggestionText"></p>
+  </div>
+
+  <!-- Chat Sentiment Trend -->
+  <div class="card mt-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <h4 class="mb-0">Chat Sentiment Trend</h4>
+
+      <div class="btn-group" role="group" aria-label="Sentiment filters">
+        <button id="sentBtnDay" class="btn btn-outline-secondary btn-sm" onclick="loadSentimentRange('day')">
+          1 Day
+        </button>
+        <button id="sentBtnWeek" class="btn btn-outline-secondary btn-sm" onclick="loadSentimentRange('week')">
+          1 Week
+        </button>
+        <button id="sentBtnMonth" class="btn btn-outline-secondary btn-sm" onclick="loadSentimentRange('month')">
+          1 Month
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <canvas id="sentimentChart" height="120"></canvas>
+    </div>
+
+    <div id="sentimentEmpty" class="text-muted small mt-2" style="display:none;">
+      No sentiment data for this range yet. Send a few chat messages first.
+    </div>
+  </div>
+
+  <!-- Mood vs Sentiment -->
+  <div class="card mt-4">
+    <h4 class="mb-3">Mood vs Sentiment (Daily Average)</h4>
+    <canvas id="moodVsSentimentChart" height="120"></canvas>
+    <div id="mvsEmpty" class="text-muted small mt-2" style="display:none;">
+      Not enough data to compare yet.
+    </div>
+  </div>
+
+  <!-- Burnout -->
+  <div class="card mt-4 text-white" id="burnoutCard" style="display:none;">
+    <h5>🔥 Burnout Status</h5>
+    <p id="burnout-level" class="fw-bold mb-1"></p>
+    <small id="burnout-message"></small>
+    <div class="mt-3" id="burnoutActions" style="display:none;">
+      <a id="burnoutConsult" class="btn btn-light btn-sm" href="#" style="display:none;">Consult Psychiatrist</a>
+      <a id="burnoutRedirect" class="btn btn-dark btn-sm" href="#" style="display:none;">Go Now</a>
+    </div>
+  </div>
+
+</div>
+
+<div id="notification"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+let moodChartInstance = null;
+let sentimentChartInstance = null;
+let moodVsSentimentChartInstance = null;
+
+// flash hide
+window.addEventListener('DOMContentLoaded', () => {
+  const successMsg = document.getElementById('successMessage');
+  if(successMsg){
+    setTimeout(()=>{
+      successMsg.style.transition = 'opacity 0.5s ease';
+      successMsg.style.opacity = 0;
+      setTimeout(()=>{ successMsg.remove(); },500);
+    }, 2000);
+  }
+});
+
+// ---------- UI helpers ----------
+function setMoodButtonsActive(mode){
+  const ids = ["btnDaily","btnWeekly","btnMonthly"];
+  ids.forEach(id => document.getElementById(id)?.classList.remove("active"));
+  if(mode === "daily") document.getElementById("btnDaily")?.classList.add("active");
+  if(mode === "weekly") document.getElementById("btnWeekly")?.classList.add("active");
+  if(mode === "monthly") document.getElementById("btnMonthly")?.classList.add("active");
+}
+
+function show(elId, yes=true){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.style.display = yes ? "block" : "none";
+}
+
+// ---------- aggregation helpers ----------
+function pad2(n){ return String(n).padStart(2,"0"); }
+
+function formatDayKey(d){
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+}
+
+function formatMonthKey(d){
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
+}
+
+function avg(arr){
+  if(!arr.length) return null;
+  return arr.reduce((s,x)=>s+x,0)/arr.length;
+}
+
+function emojiFromAvg(v){
+  if(v == null) return "—";
+  if(v < 2.5) return "😔";
+  if(v < 3.5) return "😐";
+  return "😊";
+}
+
+/**
+ * history item expected:
+ * { value: 1..5, timestamp: ISO, source: "..." }
+ */
+function aggregateMood(history, mode){
+  const groups = new Map();
+
+  for(const m of history){
+    const d = new Date(m.timestamp);
+    let key;
+
+    if(mode === "weekly"){
+      key = `${d.getFullYear()}-W${getWeek(d)}`;
+    } else if(mode === "monthly"){
+      key = formatMonthKey(d);
+    } else {
+      key = formatDayKey(d);
+    }
+
+    if(!groups.has(key)) groups.set(key, { values: [] });
+    groups.get(key).values.push(Number(m.value));
+  }
+
+  let keys = Array.from(groups.keys());
+  if(mode === "weekly"){
+    keys.sort((a,b)=>{
+      const [ay,aw] = a.split("-W").map(Number);
+      const [by,bw] = b.split("-W").map(Number);
+      if(ay !== by) return ay - by;
+      return aw - bw;
+    });
+  } else {
+    keys.sort();
+  }
+
+  const labels = [];
+  const values = [];
+  const emojis = [];
+
+  for(const k of keys){
+    const v = avg(groups.get(k).values);
+    const rounded = v == null ? null : Math.round(v * 100) / 100;
+    labels.push(k);
+    values.push(rounded);
+    emojis.push(emojiFromAvg(rounded));
+  }
+
+  return { labels, values, emojis };
+}
+
+// ---------- SENTIMENT RANGE ----------
+function setSentimentButtonsActive(range) {
+  const ids = ["sentBtnDay","sentBtnWeek","sentBtnMonth"];
+  ids.forEach(id => document.getElementById(id)?.classList.remove("active"));
+  if(range === "day") document.getElementById("sentBtnDay")?.classList.add("active");
+  else if(range === "month") document.getElementById("sentBtnMonth")?.classList.add("active");
+  else document.getElementById("sentBtnWeek")?.classList.add("active");
+}
+
+function formatSentimentLabels(labels, range) {
+  if (range !== "day") return labels;
+  // "YYYY-MM-DD HH:00" -> "HH:00"
+  return labels.map(x => {
+    const parts = String(x).split(" ");
+    return parts.length === 2 ? parts[1] : x;
+  });
+}
+
+async function loadSentimentRange(range = "week") {
+  try {
+    setSentimentButtonsActive(range);
+
+    const res = await fetch(`/chat/sentiment/range?range=${range}`);
+    const data = await res.json();
+
+    const rawLabels = data.labels || [];
+    const values = (data.values || []).map(v => (v === null ? null : Number(v)));
+    const labels = formatSentimentLabels(rawLabels, range);
+
+    show("sentimentEmpty", labels.length === 0);
+
+    const ctx = document.getElementById("sentimentChart").getContext("2d");
+    if (sentimentChartInstance) sentimentChartInstance.destroy();
+
+    sentimentChartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: range === "day" ? "Avg Sentiment (Hourly)" : "Avg Sentiment (Daily)",
+          data: values,
+          tension: 0.3,
+          spanGaps: true
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { min: -1, max: 1 } }
+      }
+    });
+  } catch (e) {
+    console.error("Sentiment range load failed:", e);
+  }
+}
+
+// ---------- MOOD VS SENTIMENT ----------
+async function loadMoodVsSentiment() {
+  try{
+    const res = await fetch("/analytics/mood_vs_sentiment");
+    const data = await res.json();
+
+    if(!Array.isArray(data) || data.length === 0){
+      show("mvsEmpty", true);
+      return;
+    }
+
+    const labels = data.map(x => x.day);
+    const mood = data.map(x => x.avg_mood);
+    const sent = data.map(x => x.avg_sent);
+
+    const any = (arr) => arr.some(v => v !== null && v !== undefined);
+    if(!any(mood) && !any(sent)){
+      show("mvsEmpty", true);
+      return;
+    }
+    show("mvsEmpty", false);
+
+    const ctx = document.getElementById("moodVsSentimentChart").getContext("2d");
+    if(moodVsSentimentChartInstance) moodVsSentimentChartInstance.destroy();
+
+    moodVsSentimentChartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          { label: "Avg Mood (1–5)", data: mood, tension: 0.3, yAxisID: "yMood" },
+          { label: "Avg Sentiment (-1–+1)", data: sent, tension: 0.3, yAxisID: "ySent" }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          yMood: { position: "left", min: 1, max: 5 },
+          ySent: { position: "right", min: -1, max: 1, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  }catch(e){
+    console.error("Mood vs sentiment load failed:", e);
+  }
+}
+
+// ---------- MOOD CHART (uses MoodEntry history) ----------
+async function loadMood(mode="daily"){
+  try{
+    setMoodButtonsActive(mode);
+
+    const history = await fetch("/mood/history").then(r=>r.json());
+    const stats = await fetch("/mood/stats").then(r=>r.json());
+
+    history.sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+
+    document.getElementById("statsText").innerText =
+      `Average: ${stats.average ?? "-"} | Min: ${stats.min ?? "-"} | Max: ${stats.max ?? "-"}`;
+
+    const streak = Number(stats.positive_streak ?? 0);
+    document.getElementById("streakText").innerText =
+      `🔥 Positive Mood Streak: ${streak} day${streak!==1 ? "s" : ""}`;
+
+    if(!history.length){
+      show("moodEmpty", true);
+    } else {
+      show("moodEmpty", false);
+    }
+
+    const agg = aggregateMood(history, mode);
+
+    // if only one data point, keep chart but show it clearly
+    const ctx = document.getElementById("moodChart").getContext("2d");
+    if(moodChartInstance) moodChartInstance.destroy();
+
+    moodChartInstance = new Chart(ctx,{
+      type:"line",
+      data:{
+        labels: agg.labels,
+        datasets:[{
+          label: mode === "daily" ? "Avg Mood (Daily)" : mode === "weekly" ? "Avg Mood (Weekly)" : "Avg Mood (Monthly)",
+          data: agg.values,
+          borderWidth: 2,
+          tension: 0.3,
+          fill: true,
+          pointRadius: 6,
+          pointHoverRadius: 9,
+          spanGaps: true
+        }]
+      },
+      options:{
+        responsive: true,
+        scales:{ y:{ min:1, max:5, ticks:{ stepSize:1 } } },
+        plugins:{
+          legend:{ display:true },
+          tooltip:{ callbacks:{ label:function(ctx){
+            const emoji = agg.emojis[ctx.dataIndex];
+            const value = ctx.raw;
+            return `${emoji} Avg: ${value}`;
+          }}}
+        }
+      }
+    });
+
+    updateSentimentAndSuggestions(history);
+    await checkBurnoutFromAPI();
+  } catch(e){
+    console.error("Mood load failed:", e);
+  }
+}
+
+function updateSentimentAndSuggestions(history){
+  if(!history.length){
+    document.getElementById("sentimentText").innerHTML = `<span class="neutral">No mood data yet</span>`;
+    document.getElementById("suggestionText").innerText = "Add a mood check-in or a journal entry to begin tracking.";
+    return;
+  }
+
+  const last = Number(history[history.length-1].value);
+  let sentiment, suggestion;
+
+  if(last<=2){
+    sentiment="😔 Low mood detected";
+    suggestion="Try a mindfulness exercise, breathing, or talk to someone you trust.";
+  } else if(last===3){
+    sentiment="😐 Neutral mood detected";
+    suggestion="Consider journaling and reflecting on what influenced your day.";
+  } else {
+    sentiment="😊 Positive mood detected";
+    suggestion="Great time for gratitude journaling or maintaining healthy routines!";
+  }
+
+  document.getElementById("sentimentText").innerHTML =
+    `<span class="${last<=2?'low':last===3?'neutral':'high'}">${sentiment}</span>`;
+  document.getElementById("suggestionText").innerText = suggestion;
+}
+
+// ---------- Burnout (✅ use backend /api/mood/burnout) ----------
+async function checkBurnoutFromAPI(){
+  const card = document.getElementById("burnoutCard");
+  const levelEl = document.getElementById("burnout-level");
+  const msgEl = document.getElementById("burnout-message");
+
+  const actionsWrap = document.getElementById("burnoutActions");
+  const consultBtn = document.getElementById("burnoutConsult");
+  const redirectBtn = document.getElementById("burnoutRedirect");
+
+  try{
+    const res = await fetch("/api/mood/burnout");
+    const data = await res.json();
+
+    if(!data || typeof data !== "object"){
+      card.style.display = "none";
+      return;
+    }
+
+    card.style.display = "block";
+    levelEl.innerText = data.level || "Normal";
+    msgEl.innerText = data.message || "";
+
+    actionsWrap.style.display = "none";
+    consultBtn.style.display = "none";
+    redirectBtn.style.display = "none";
+
+    if(data.level === "Normal"){
+      card.style.background = "#27ae60";
+    } else if(data.level === "Moderate" || data.level === "Warning"){
+      card.style.background = "#f39c12";
+      if(data.consult_url){
+        actionsWrap.style.display = "block";
+        consultBtn.style.display = "inline-block";
+        consultBtn.href = data.consult_url;
+      }
+    } else {
+      card.style.background = "#c0392b";
+      if(data.redirect_url){
+        actionsWrap.style.display = "block";
+        redirectBtn.style.display = "inline-block";
+        redirectBtn.href = data.redirect_url;
+      } else if(data.consult_url){
+        actionsWrap.style.display = "block";
+        consultBtn.style.display = "inline-block";
+        consultBtn.href = data.consult_url;
+      }
+    }
+  } catch(e){
+    console.error("Burnout API failed:", e);
+    card.style.display = "none";
+  }
+}
+
+// ---------- Week helper ----------
+function getWeek(d){
+  d=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const dayNum=d.getUTCDay()||7;
+  d.setUTCDate(d.getUTCDate()+4-dayNum);
+  const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  return Math.ceil((((d-yearStart)/86400000)+1)/7);
+}
+
+// Init
+document.addEventListener("DOMContentLoaded", () => {
+  loadMood("daily");
+  loadSentimentRange("week");
+  loadMoodVsSentiment();
+});
+</script>
+
+</body>
+</html>

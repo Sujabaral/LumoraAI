@@ -1,0 +1,154 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container py-5">
+
+  <!-- Profile Card -->
+  <div class="row justify-content-center mb-5">
+    <div class="col-md-6">
+      <div class="card shadow-lg rounded-4 border-0">
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center">
+            <img src="{{ url_for('static', filename='profile_images/' + current_user.profile_image) }}"
+                 alt="Profile image"
+                 class="rounded-circle border border-info p-1"
+                 style="width: 150px; height: 150px;">
+
+            <div class="ms-4 flex-grow-1">
+              <h4 class="fw-bold mb-1">#{{ current_user.id }} {{ current_user.username }}</h4>
+              <p class="text-muted mb-2">{{ current_user.email }}</p>
+
+              <div class="d-flex gap-2">
+
+                <!-- ✅ Delete ALL Conversations (Account button) -->
+                <form action="{{ url_for('users.delete_conversation') }}" method="POST" class="m-0">
+                  {{ csrf_token() and "" }} {# keep line for Jinja safety #}
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="scope" value="all">
+                  <input type="hidden" name="next" value="account">
+                  <button type="submit" class="btn btn-outline-danger btn-sm"
+                          onclick="return confirm('Delete ALL conversations? This cannot be undone.');">
+                    Delete Conversation
+                  </button>
+                </form>
+
+                <!-- Open modal -->
+                <button type="button"
+                        class="btn btn-outline-danger btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteAccountModal">
+                  Delete Account
+                </button>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Delete Account Modal (REAL form with action) -->
+  <div class="modal fade" id="deleteAccountModal" tabindex="-1"
+       aria-labelledby="deleteAccountModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content rounded-4 shadow-lg">
+
+        <!-- ✅ IMPORTANT: form wraps footer button -->
+        <form action="{{ url_for('users.delete_account') }}" method="POST" class="m-0">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="modal-header">
+            <h5 class="modal-title text-danger" id="deleteAccountModalLabel">Delete Account?</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+
+          <div class="modal-body">
+            Are you sure you want to delete your account? This action cannot be undone.
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">
+              Close
+            </button>
+
+            <!-- ✅ MUST be submit -->
+            <button type="submit" class="btn btn-danger rounded-pill"
+                    onclick="return confirm('Delete your ACCOUNT permanently?');">
+              Delete
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Info Form -->
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow-lg rounded-4 border-0 p-4">
+        <h3 class="text-center fw-bold text-primary mb-4">Account Info</h3>
+
+        <form method="POST" action="{{ url_for('users.account') }}" enctype="multipart/form-data">
+          {{ form.hidden_tag() }}
+
+          <div class="mb-3">
+            {{ form.username.label(class="form-label") }}
+            {% if form.username.errors %}
+              {{ form.username(class="form-control form-control-lg is-invalid") }}
+              {% for error in form.username.errors %}
+                <div class="invalid-feedback">{{ error }}</div>
+              {% endfor %}
+            {% else %}
+              {{ form.username(class="form-control form-control-lg") }}
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            {{ form.email.label(class="form-label") }}
+            {% if form.email.errors %}
+              {{ form.email(class="form-control form-control-lg is-invalid") }}
+              {% for error in form.email.errors %}
+                <div class="invalid-feedback">{{ error }}</div>
+              {% endfor %}
+            {% else %}
+              {{ form.email(class="form-control form-control-lg") }}
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            {{ form.preferred_mode.label(class="form-label") }}
+            {% if form.preferred_mode.errors %}
+              {{ form.preferred_mode(class="form-select form-select-lg is-invalid") }}
+              {% for error in form.preferred_mode.errors %}
+                <div class="invalid-feedback">{{ error }}</div>
+              {% endfor %}
+            {% else %}
+              {{ form.preferred_mode(class="form-select form-select-lg") }}
+            {% endif %}
+            <div class="form-text">
+              Choose how LUMORA talks to you (Auto / Listener / Coach / Therapist / Balanced).
+            </div>
+          </div>
+
+          <div class="mb-3">
+            {{ form.picture.label(class="form-label") }}
+            {{ form.picture(class="form-control") }}
+            {% if form.picture.errors %}
+              {% for error in form.picture.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            {% endif %}
+          </div>
+
+          <div class="d-grid">
+            {{ form.submit(class="btn btn-primary btn-lg rounded-pill") }}
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock content %}

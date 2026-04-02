@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='styles/evaluation.css') }}">
+
+<div class="eval-page">
+  <div class="eval-container">
+
+    <div class="eval-top">
+      <div class="eval-title">
+        <h1>J3: Usage & Outcome Indicators</h1>
+        <p>
+          This section provides higher-level analytics: engagement trend (sessions),
+          sentiment trend over time, and changes in self-assessment scores (PHQ-9 / GAD-7).
+        </p>
+      </div>
+      <div class="badge">
+        <strong>Window:</strong> Last 7–14 days comparison
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Key Indicators</h2>
+      <p class="meta">These are “credit-heavy” because they show outcomes, not just features.</p>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="label">Sessions Used</div>
+          <div class="value">{{ data.sessions }}</div>
+          <div class="sub">Non-archived sessions created by the user</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Avg Sentiment Trend</div>
+          <div class="value">{{ data.avg_trend }}</div>
+          <div class="sub">Recent 7-day avg minus previous 7-day avg</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Assessment Change</div>
+          <div class="value">{{ data.assessment_change }}</div>
+          <div class="sub">Latest score − earliest score (PHQ-9/GAD-7)</div>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+      <p class="note">
+        These indicators are informative but not diagnostic. They help the user track patterns over time.
+      </p>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>Weekly Engagement vs Sentiment</h2>
+      <p class="meta">Combines usage (sessions/week) and emotional trend (avg sentiment/week).</p>
+      <img class="eval-img" src="{{ url_for('chatbot.j3_timeline_chart') }}" alt="timeline chart">
+      <p class="note">
+        This visualization supports reflective monitoring: higher engagement with improving sentiment may indicate better coping practices.
+      </p>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

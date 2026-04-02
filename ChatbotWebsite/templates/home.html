@@ -1,0 +1,345 @@
+{% extends 'layout.html' %}
+{% block content %}
+
+<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+<meta name="theme-color" content="#FF6F61">
+
+<style>
+  #home-container { min-height: calc(100vh - 120px); }
+
+  .calendar-wrap{ width:100%; max-width:1100px; margin-top:26px; }
+  .glass-card{
+    background: rgba(255,255,255,0.88);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 20px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.10);
+    backdrop-filter: blur(10px);
+  }
+  .calendar-header{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; padding:16px 18px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .calendar-header h3{ margin:0; font-weight:800; color:#0f172a; }
+  .calendar-header small{ color:#64748b; }
+  .calendar-body{
+    padding: 12px 14px 16px;
+    overflow-x: auto;          /* ✅ prevents overflow on small screens */
+  }
+
+  /* ✅ calendar sizing (NO collapse) */
+  #calendar{
+    width: 100%;
+    max-width: 1050px;
+    min-height: 680px;         /* ✅ month squares visible */
+    margin: 0 auto;
+  }
+
+  /* ---------- FullCalendar UX polish ---------- */
+  .fc { font-size: 0.92rem; }
+  .fc .fc-toolbar-title { font-size: 1.2rem; font-weight: 900; color:#0f172a; }
+  .fc a { text-decoration: none !important; }
+
+  /* Make month cells feel square-ish and spacious */
+  .fc .fc-daygrid-day-frame{
+    min-height: 110px;
+    padding: 6px;
+  }
+  .fc .fc-daygrid-day-number{
+    font-weight: 900;
+    color:#0f172a;
+  }
+
+  /* Buttons */
+  .fc .fc-button{
+    border-radius: 12px;
+    font-weight: 800;
+    border: 0;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.10);
+  }
+  .fc .fc-button:focus{ box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25); }
+  .fc .fc-button-primary{
+    background:#0f172a;
+  }
+  .fc .fc-button-primary:hover{
+    background:#111c33;
+  }
+
+  /* Dot events: keep month clean */
+  .fc .fc-daygrid-event{
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+  .fc .fc-daygrid-event-dot{
+    border-width: 6px !important;  /* bigger dot */
+    margin-right: 6px !important;
+  }
+  .fc .fc-daygrid-dot-event .fc-event-title{
+    font-size: 0.85rem;
+    font-weight: 700;
+    color:#334155;
+  }
+
+  /* Legend */
+  .legend{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:flex-end; }
+  .leg{ display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:#334155; font-weight:800; }
+  .dot{ width:12px; height:12px; border-radius:999px; display:inline-block; }
+  .dot-paid{ background:#16a34a; }
+  .dot-cash{ background:#f97316; }
+  .dot-unpaid{ background:#ef4444; }
+
+  @media(max-width:576px){
+    #calendar{ min-height: 620px; }
+    .calendar-header{ flex-direction:column; align-items:flex-start; }
+    .legend{ justify-content:flex-start; }
+  }
+</style>
+
+<div id="home-container" class="container d-flex flex-column align-items-center py-4">
+
+  <img src="{{ url_for('static', filename='images/logo.png') }}"
+       alt="Lumora AI Logo"
+       class="rounded-circle border border-info shadow-lg mb-3"
+       style="width:210px; height:210px;" />
+
+  <h1 class="fw-bold font-monospace text-info border-bottom border-info pb-2 mb-3 text-center">
+    Lumora AI Chatbot
+  </h1>
+
+  <p class="lead text-secondary text-center mb-4" style="max-width:650px;">
+    Your friendly mental health companion. Chat anytime for guidance, tips, and exercises to support your emotional wellbeing.
+  </p>
+
+  {% if current_user.is_authenticated %}
+    <a href="{{ url_for('chatbot.chat') }}"
+       class="btn btn-primary btn-lg shadow mb-3"
+       style="--bs-btn-padding-y:1.25rem; --bs-btn-padding-x:5rem; --bs-btn-font-size:1.6rem; font-weight:800;">
+      CHAT NOW
+    </a>
+  {% endif %}
+
+  {% if current_user.is_authenticated %}
+
+    <div class="calendar-wrap">
+
+      <!-- Notifications -->
+      <div class="glass-card w-100 mt-4 p-3" style="max-width:1100px;">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 fw-bold">🔔 Notifications</h5>
+          <a class="btn btn-sm btn-outline-dark" href="{{ url_for('main.notifications_page') }}">View all</a>
+        </div>
+        <hr>
+        {% if notes and notes|length > 0 %}
+          <ul class="list-group list-group-flush">
+            {% for n in notes %}
+              <li class="list-group-item bg-transparent">
+                <div class="fw-bold">{{ n.title }}</div>
+                <div class="text-muted small">{{ n.body }}</div>
+                <div class="text-muted small">{{ n.created_at.strftime("%Y-%m-%d %I:%M %p") }}</div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="text-muted">No notifications yet.</div>
+        {% endif %}
+      </div>
+
+      <!-- Calendar -->
+      <div class="glass-card mt-4">
+        <div class="calendar-header">
+          <div>
+            <h3 class="h5 mb-0">📅 Your Appointments Calendar</h3>
+            <small>Tap a date to see your appointment times.</small>
+          </div>
+          <div class="legend">
+            <span class="leg"><span class="dot dot-paid"></span> Paid</span>
+            <span class="leg"><span class="dot dot-cash"></span> Cash on Visit</span>
+            <span class="leg"><span class="dot dot-unpaid"></span> Unpaid</span>
+          </div>
+        </div>
+
+        <div class="calendar-body">
+          <div id="calendar">
+            <div class="text-muted text-center py-5">Loading calendar…</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Day details modal -->
+    <div class="modal fade" id="dayModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius:16px;">
+          <div class="modal-header">
+            <h5 class="modal-title" id="dayModalTitle">Appointments</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="dayModalBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ Local FullCalendar bundle -->
+    <script src="{{ url_for('static', filename='vendor/fullcalendar/fullcalendar.global.min.js') }}"></script>
+
+    <script>
+      const BOOKINGS_API = "{{ url_for('main.api_bookings') }}";
+
+      function statusText(b){
+        const method = (b.payment_method || "").toLowerCase();
+        if (b.paid) return "Paid";
+        if (method === "cash") return "Cash on Visit";
+        return "Unpaid";
+      }
+
+      function dotColor(b){
+        const method = (b.payment_method || "").toLowerCase();
+        if (b.paid) return "#16a34a";
+        if (method === "cash") return "#f97316";
+        return "#ef4444";
+      }
+
+      async function fetchBookings(){
+        const res = await fetch(BOOKINGS_API, { headers: { "Accept": "application/json" } });
+        if(!res.ok) throw new Error("Bookings API failed: " + res.status);
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+
+      function groupByDate(bookings){
+        const map = {};
+        for (const b of bookings){
+          const start = b.start || b.start_time;
+          if(!start) continue;
+          const d = String(start).slice(0,10); // YYYY-MM-DD
+          if(!map[d]) map[d] = [];
+          map[d].push(b);
+        }
+        for (const d in map){
+          map[d].sort((a,b) => String(a.start||a.start_time).localeCompare(String(b.start||b.start_time)));
+        }
+        return map;
+      }
+
+      function openDayModal(dateStr, items){
+        const title = document.getElementById("dayModalTitle");
+        const body  = document.getElementById("dayModalBody");
+
+        title.textContent = `Appointments • ${dateStr}`;
+
+        if (!items || items.length === 0){
+          body.innerHTML = `<div class="text-muted">No appointments on this day.</div>`;
+        } else {
+          body.innerHTML = `
+            <ul class="list-group">
+              ${items.map(b => {
+                const start = b.start || b.start_time;
+                const t = new Date(start).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                const doc = b.psychiatrist_name || "Doctor";
+                const st  = statusText(b);
+                const badge = b.paid ? "bg-success" : ((b.payment_method || "").toLowerCase()==="cash" ? "bg-warning text-dark" : "bg-danger");
+                return `
+                  <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                      <div class="fw-bold">${doc}</div>
+                      <div class="text-muted small">${t}</div>
+                    </div>
+                    <span class="badge ${badge}">${st}</span>
+                  </li>
+                `;
+              }).join("")}
+            </ul>
+          `;
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById("dayModal"));
+        modal.show();
+      }
+
+      async function startCalendar(){
+        const calEl = document.getElementById("calendar");
+        if(!calEl) return;
+
+        try{
+          if (!window.FullCalendar || typeof FullCalendar.Calendar !== "function"){
+            throw new Error("FullCalendar bundle not loaded (FullCalendar.Calendar missing)");
+          }
+
+          const bookings = await fetchBookings();
+          const byDate = groupByDate(bookings);
+
+          // Dot events (clean month view)
+          const events = bookings.map(b => {
+            const start = b.start || b.start_time;
+            const end   = b.end || b.end_time || null;
+            const color = dotColor(b);
+
+            return {
+              id: String(b.id),
+              title: b.psychiatrist_name || "Appointment",
+              start,
+              end,
+              display: "list-item",     // ✅ dot in month view
+              backgroundColor: color,
+              borderColor: color,
+              extendedProps: b
+            };
+          });
+
+          calEl.innerHTML = "";
+
+          const calendar = new FullCalendar.Calendar(calEl, {
+            initialView: "dayGridMonth",   // ✅ square month grid
+            height: 680,                  // ✅ prevents collapse
+            expandRows: true,
+            fixedWeekCount: false,
+            dayMaxEvents: 2,
+
+            headerToolbar: {
+              left: "prev,next today",
+              center: "title",
+              right: "dayGridMonth,timeGridWeek"
+            },
+
+            events,
+
+            // Click a day -> show times
+            dateClick: function(info){
+              const dateStr = info.dateStr; // YYYY-MM-DD
+              openDayModal(dateStr, byDate[dateStr] || []);
+            },
+
+            // Click a dot -> also show that day
+            eventClick: function(info){
+              const dateStr = info.event.startStr.slice(0,10);
+              openDayModal(dateStr, byDate[dateStr] || []);
+            }
+          });
+
+          calendar.render();
+
+        } catch (err){
+          console.error(err);
+          calEl.innerHTML = `
+            <div class="alert alert-danger m-2">
+              Calendar error: ${err.message}<br>
+              <small>Open Console for details.</small>
+            </div>
+          `;
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", startCalendar);
+      } else {
+        startCalendar();
+      }
+    </script>
+
+  {% endif %}
+
+</div>
+
+{% endblock content %}

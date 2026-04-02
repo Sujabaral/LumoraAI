@@ -1,0 +1,419 @@
+{# ChatbotWebsite/templates/psychiatrist.html #}
+{% extends "layout.html" %}
+
+{% block style %}
+<style>
+:root{
+  --lumora-red:#d63031;
+  --lumora-peach:#ffb4b4;
+  --lumora-pink:#ffd6f0;
+  --lumora-lav:#f0e3ff;
+  --lumora-ink:#2d3436;
+  --lumora-muted:#636e72;
+  --lumora-card:rgba(255,255,255,0.86);
+  --lumora-glow:rgba(214,48,49,0.18);
+}
+
+.wrapper{max-width:1120px;margin:0 auto;}
+
+.topbar{
+  background:var(--lumora-card);
+  border:1px solid rgba(0,0,0,0.06);
+  border-radius:22px;
+  padding:18px 20px;
+  box-shadow:0 16px 40px rgba(0,0,0,0.12);
+  backdrop-filter: blur(10px);
+}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand-badge{
+  width:42px;height:42px;border-radius:14px;
+  background:linear-gradient(135deg,#d63031,#e17055);
+  box-shadow:0 10px 22px var(--lumora-glow);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:900;
+}
+.brand h2{margin:0;font-weight:900;color:var(--lumora-ink);}
+.brand small{color:var(--lumora-muted);}
+
+.section-title{font-weight:900;color:var(--lumora-ink);margin:14px 0 4px;}
+.section-sub{color:var(--lumora-muted);margin-bottom:12px;}
+
+.doc-card{
+  background:var(--lumora-card);
+  border:1px solid rgba(0,0,0,0.06);
+  border-radius:22px;
+  overflow:hidden;
+  box-shadow:0 16px 40px rgba(0,0,0,0.10);
+  backdrop-filter: blur(10px);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  cursor:pointer;height:100%;
+  position:relative;
+  user-select:none;
+}
+.doc-card:hover{transform:translateY(-3px);box-shadow:0 18px 44px rgba(0,0,0,0.14);}
+.doc-card.selected{
+  border-color:rgba(214,48,49,0.55);
+  box-shadow:0 18px 48px rgba(214,48,49,0.18);
+}
+.doc-img{height:160px;width:100%;object-fit:cover;display:block;filter:saturate(1.05);}
+
+.doc-body{padding:14px 16px 16px;}
+.doc-name{font-weight:900;color:var(--lumora-ink);margin-bottom:4px;}
+.doc-meta{color:var(--lumora-muted);font-size:0.92rem;}
+
+.pill{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 10px;border-radius:999px;
+  border:1px solid rgba(214,48,49,0.18);
+  background:rgba(214,48,49,0.08);
+  color:var(--lumora-red);
+  font-weight:800;font-size:0.86rem;
+}
+.select-dot{
+  position:absolute;top:14px;right:14px;
+  width:14px;height:14px;border-radius:999px;
+  border:2px solid rgba(255,255,255,0.9);
+  background:rgba(0,0,0,0.10);
+  box-shadow:0 10px 18px rgba(0,0,0,0.18);
+}
+.doc-card.selected .select-dot{
+  background:linear-gradient(135deg,#d63031,#e17055);
+}
+
+.consult-card{
+  background:var(--lumora-card);
+  border:1px solid rgba(0,0,0,0.06);
+  border-radius:24px;
+  padding:22px 18px;
+  box-shadow:0 16px 40px rgba(0,0,0,0.12);
+  backdrop-filter: blur(10px);
+  position:sticky;top:18px;
+}
+.consult-card h3{font-weight:900;color:var(--lumora-ink);margin-bottom:6px;}
+.consult-card p{color:var(--lumora-muted);margin-bottom:12px;}
+
+.selected-box{
+  margin-top:8px;
+  padding:12px 12px;
+  border-radius:16px;
+  background:rgba(0,0,0,0.04);
+  border:1px dashed rgba(0,0,0,0.12);
+  color:var(--lumora-ink);
+  font-weight:800;
+}
+
+hr.soft{border:none;height:1px;background:rgba(0,0,0,0.08);margin:16px 0;}
+
+input,select{
+  width:100%;
+  padding:12px;border-radius:14px !important;
+  border:1px solid rgba(0,0,0,0.10) !important;
+  background:rgba(255,255,255,0.92) !important;
+}
+
+/* ✅ spacing fix for “appointment line too above” */
+#apptDate{ margin-top:14px; }
+#apptTime, #method{ margin-top:12px; }
+
+input:focus,select:focus{
+  border-color:rgba(214,48,49,0.45) !important;
+  box-shadow:0 0 0 .25rem rgba(214,48,49,0.12) !important;
+}
+
+.btn-primary{
+  margin-top:16px;width:100%;
+  padding:12px;border-radius:14px;
+  background:linear-gradient(135deg,#d63031,#e17055);
+  border:none;font-weight:900;font-size:1rem;
+  transition:transform .15s ease, box-shadow .15s ease;
+  box-shadow:0 16px 30px rgba(214,48,49,0.20);
+}
+.btn-primary:hover{transform:translateY(-2px);}
+.btn-primary:disabled{opacity:.6;box-shadow:none;transform:none;}
+
+.note{margin-top:10px;font-size:0.88rem;color:var(--lumora-muted);}
+</style>
+{% endblock style %}
+
+{% block content %}
+<div class="wrapper">
+
+  <div class="topbar mb-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="brand">
+        <div class="brand-badge">L</div>
+        <div>
+          <h2 class="h4">Lumora Consultation</h2>
+          <small>Choose a psychiatrist • Book a slot • Pay securely</small>
+        </div>
+      </div>
+      <div class="pill">Fixed Fee: NPR {{ fixed_amount or 1500 }}</div>
+    </div>
+  </div>
+
+  <div class="row g-4 align-items-start">
+    <!-- LEFT -->
+    <div class="col-lg-8">
+      <div>
+        <div class="section-title h5">Choose your psychiatrist</div>
+        <div class="section-sub">Tap a card to select. You can change anytime before payment.</div>
+      </div>
+
+      <div class="row g-3" id="psyList">
+        {% for p in psychiatrists %}
+        <div class="col-md-6">
+          <div class="doc-card" data-id="{{ p.id }}" data-name="{{ p.name }}">
+            <div class="select-dot"></div>
+
+            <img class="doc-img"
+                 src="{{ url_for('static', filename=p.image) }}"
+                 alt="{{ p.name }}"
+                 onerror="this.style.display='none'">
+
+            <div class="doc-body">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                  <div class="doc-name">{{ p.name }}</div>
+                  <div class="doc-meta">{{ p.specialty }}</div>
+                </div>
+                <span class="pill">{{ p.location }}</span>
+              </div>
+
+              <div class="doc-meta mt-2">🗓️ {{ p.availability }}</div>
+              <div class="doc-meta">🗣️ {{ p.languages|join(", ") }}</div>
+              <div class="doc-meta mt-1">{{ p.about }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="col-lg-4">
+      <div class="consult-card">
+        <h3>🩺 Book your slot</h3>
+        <p>Fixed fee NPR <strong>{{ fixed_amount or 1500 }}</strong>. Select doctor + date/time and continue.</p>
+
+        <div class="selected-box" id="selectedDisplay">
+          Selected: <span class="text-muted">None</span>
+        </div>
+
+        <hr class="soft">
+
+        <input type="date" id="apptDate" class="form-control" required>
+
+        <select id="apptTime" class="form-control" required>
+          <option value="">Select time</option>
+        </select>
+
+        <select id="method" class="form-control" required>
+          <option value="">Select Payment Method</option>
+          <option value="khalti">Khalti (Sandbox)</option>
+          <option value="cash">Cash on Visit</option>
+          <option value="esewa">eSewa (Coming Soon)</option>
+          <option value="fonepay">Fonepay (Coming Soon)</option>
+        </select>
+
+        <button id="payBtn" class="btn btn-primary" disabled>
+          Continue • NPR {{ fixed_amount or 1500 }}
+        </button>
+
+        <div class="note">
+          Lumora tip: pick the doctor that feels safest for you — you can always switch later.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block script %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const FIXED_AMOUNT = {{ fixed_amount or 1500 }};
+  const BOOKED_SLOTS_API = "{{ url_for('main.api_booked_slots') }}";
+
+  let selected = { id: "", name: "" };
+
+  // ✅ 30-min slots
+  function generateSlots(start="09:00", end="20:00", stepMin=30){
+    const out = [];
+    const [sh, sm] = start.split(":").map(Number);
+    const [eh, em] = end.split(":").map(Number);
+
+    let cur = sh * 60 + sm;
+    const stop = eh * 60 + em;
+
+    while(cur <= stop){
+      const hh = String(Math.floor(cur / 60)).padStart(2,"0");
+      const mm = String(cur % 60).padStart(2,"0");
+      out.push(`${hh}:${mm}`);
+      cur += stepMin;
+    }
+    return out;
+  }
+
+  function fillTimeDropdown(){
+    const timeEl = document.getElementById("apptTime");
+    if (!timeEl) return;
+
+    const prev = timeEl.value;
+    const slots = generateSlots("09:00","20:00",30);
+
+    timeEl.innerHTML = `<option value="">Select time</option>` +
+      slots.map(s => `<option value="${s}">${s}</option>`).join("");
+
+    if (slots.includes(prev)) timeEl.value = prev;
+  }
+
+  async function refreshBookedSlots(){
+  const dateEl = document.getElementById("apptDate");
+  const timeEl = document.getElementById("apptTime");
+  if (!dateEl || !timeEl) return;
+
+  const date = dateEl.value;
+  if (!date || !selected.id) return;
+
+  // ✅ FIX: handle cache-busting ?v= correctly
+  const url = new URL(BOOKED_SLOTS_API, window.location.origin);
+  url.searchParams.set("date", date);
+  url.searchParams.set("psychiatrist_id", selected.id);
+
+  const res = await fetch(url.toString());
+  const data = await res.json();
+  const booked = new Set((data.slots || []).map(String));
+
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  for (const opt of timeEl.options){
+    if (!opt.value) continue;
+
+    let disabled = false;
+
+    if (booked.has(opt.value)) disabled = true;
+
+    if (date === todayStr){
+      const [h,m] = opt.value.split(":").map(Number);
+      const mins = h * 60 + m;
+      if (mins <= currentMinutes) disabled = true;
+    }
+
+    opt.disabled = disabled;
+    opt.textContent = disabled ? `${opt.value} (Unavailable)` : opt.value;
+  }
+
+  if (booked.has(timeEl.value)) timeEl.value = "";
+}
+
+  function updateButtonText() {
+    const methodEl = document.getElementById("method");
+    const payBtn = document.getElementById("payBtn");
+    if (!methodEl || !payBtn) return;
+
+    const method = methodEl.value;
+    if (!method) {
+      payBtn.textContent = `Continue • NPR ${FIXED_AMOUNT}`;
+      return;
+    }
+    if (method === "cash") payBtn.textContent = `Book (Pay Cash on Visit) • NPR ${FIXED_AMOUNT}`;
+    else if (method === "khalti") payBtn.textContent = `Pay with Khalti • NPR ${FIXED_AMOUNT}`;
+    else payBtn.textContent = `Continue (Demo Checkout) • NPR ${FIXED_AMOUNT}`;
+  }
+
+  function canEnablePay(){
+    const method = document.getElementById("method")?.value;
+    const date = document.getElementById("apptDate")?.value;
+    const time = document.getElementById("apptTime")?.value;
+    return !!(selected.id && method && date && time);
+  }
+
+  function updateUI() {
+    const display = document.getElementById("selectedDisplay");
+    const payBtn = document.getElementById("payBtn");
+    if (!display || !payBtn) return;
+
+    display.innerHTML = selected.id
+      ? `Selected: <strong>${selected.name}</strong>`
+      : `Selected: <span class="text-muted">None</span>`;
+
+    payBtn.disabled = !canEnablePay();
+  }
+
+  // ✅ IMPORTANT: event delegation (works even if cards are re-rendered later)
+  const psyList = document.getElementById("psyList");
+  if (psyList){
+    psyList.addEventListener("click", async (e) => {
+      const card = e.target.closest(".doc-card");
+      if (!card) return;
+
+      document.querySelectorAll(".doc-card").forEach(c => c.classList.remove("selected"));
+      card.classList.add("selected");
+
+      selected = { id: card.dataset.id || "", name: card.dataset.name || "" };
+
+      fillTimeDropdown();
+      await refreshBookedSlots();
+      updateUI();
+    });
+  }
+
+  document.getElementById("method")?.addEventListener("change", () => {
+    updateButtonText();
+    updateUI();
+  });
+
+  document.getElementById("apptDate")?.addEventListener("change", async () => {
+    fillTimeDropdown();
+    await refreshBookedSlots();
+    updateUI();
+  });
+
+  document.getElementById("apptTime")?.addEventListener("change", () => {
+    updateUI();
+  });
+
+  document.getElementById("payBtn")?.addEventListener("click", async () => {
+    const date = document.getElementById("apptDate")?.value;
+    const time = document.getElementById("apptTime")?.value;
+    const method = document.getElementById("method")?.value;
+
+    if (!selected.id) return alert("Please choose a psychiatrist first.");
+    if (!date || !time || !method) return alert("Please select date, time, and payment method.");
+
+    const res = await fetch("{{ url_for('main.create_local_payment') }}", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        psychiatrist_id: selected.id,
+        psychiatrist_name: selected.name,
+        amount: FIXED_AMOUNT,
+        date,
+        time,
+        method
+      })
+    });
+
+    let data = {};
+    try { data = await res.json(); } catch(e){}
+
+    if (res.status === 409) {
+      alert(data.message || "That time is already booked. Please choose another slot.");
+      await refreshBookedSlots();
+      updateUI();
+      return;
+    }
+
+    if (data.success && data.payment_url) window.location.href = data.payment_url;
+    else alert(data.message || "Failed to create payment session.");
+  });
+
+  // init
+  fillTimeDropdown();
+  updateButtonText();
+  updateUI();
+});
+</script>
+{% endblock script %}

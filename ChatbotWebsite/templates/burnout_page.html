@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>{{ title }}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+:root{
+  --lumora-red:#d63031;
+  --lumora-peach:#ffe3e3;
+  --lumora-pink:#ffd6f0;
+  --lumora-lav:#f0e3ff;
+  --ink:#2d3436;
+  --muted:#636e72;
+  --card:rgba(255,255,255,.86);
+}
+
+body{
+  font-family:'Segoe UI',sans-serif;
+  background:
+    radial-gradient(1000px 550px at 20% 10%, #fff 0%, transparent 60%),
+    linear-gradient(135deg, var(--lumora-peach), var(--lumora-pink), var(--lumora-lav));
+  min-height:100vh;
+  padding:22px;
+}
+
+.wrapper{max-width:980px;margin:0 auto;}
+
+.glass{
+  background: var(--card);
+  border-radius:24px;
+  box-shadow:0 18px 50px rgba(0,0,0,.14);
+  backdrop-filter: blur(10px);
+}
+
+.topbar{
+  padding:18px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.badgeL{
+  width:44px;height:44px;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  background: linear-gradient(135deg, #d63031, #e17055);
+  color:#fff;font-weight:900;
+}
+
+.titleBlock h2{margin:0;font-weight:900;color:var(--ink);}
+.titleBlock p{margin:2px 0 0;color:var(--muted);}
+
+.pill{
+  padding:8px 14px;
+  border-radius:999px;
+  font-weight:900;
+  background: rgba(255,255,255,.7);
+  border:1px solid rgba(0,0,0,.1);
+}
+
+.btnHome{
+  text-decoration:none;
+  color:var(--ink);
+}
+.btnHome:hover{
+  transform:translateY(-1px);
+  box-shadow:0 8px 18px rgba(0,0,0,.12);
+}
+
+.grid{
+  display:grid;
+  grid-template-columns: 1.2fr .8fr;
+  gap:16px;
+  padding:18px;
+}
+@media(max-width:900px){ .grid{grid-template-columns:1fr;} }
+
+.cardX{
+  padding:16px;
+  border-radius:22px;
+  background: rgba(255,255,255,.75);
+}
+
+.stateGood{
+  background: linear-gradient(135deg, rgba(129,236,236,.35), rgba(116,185,255,.35));
+}
+.stateBad{
+  background: linear-gradient(135deg, rgba(255,107,107,.35), rgba(255,135,135,.35));
+}
+
+.btnLumora{
+  border-radius:14px;
+  font-weight:900;
+  padding:12px;
+}
+
+.btnPrimary{
+  background: linear-gradient(135deg, #d63031, #e17055);
+  border:none;
+  color:#fff;
+}
+
+.btnGhost{
+  background: rgba(255,255,255,.8);
+  border:1px solid rgba(0,0,0,.12);
+}
+
+.signalRow{
+  display:flex;
+  justify-content:space-between;
+  padding:10px;
+  border-radius:14px;
+  background: rgba(255,255,255,.7);
+  margin-top:10px;
+}
+
+.sigTag{
+  font-weight:900;
+  padding:6px 12px;
+  border-radius:999px;
+}
+.tagLow{color:var(--lumora-red);}
+.tagOk{color:#2d3436;}
+
+.countdown{font-weight:900;color:var(--lumora-red);margin-top:8px;}
+.smallNote{color:var(--muted);font-size:.9rem;}
+</style>
+</head>
+
+<body>
+<div class="wrapper">
+<div class="glass">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="d-flex align-items-center gap-3">
+    <div class="badgeL">L</div>
+    <div class="titleBlock">
+      <h2 class="h4">Lumora Burnout Check</h2>
+      <p>We look for repeated low signals across mood, journal mood, and chat sentiment.</p>
+    </div>
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    <a href="{{ url_for('main.home') }}" class="pill btnHome">🏠 Home</a>
+    <div class="pill" id="pillLevel">Loading…</div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="grid">
+
+<!-- LEFT -->
+<div class="cardX" id="statusCard">
+  <h5 id="statusTitle">Analyzing…</h5>
+  <p id="statusMsg" class="smallNote">Fetching your recent signals.</p>
+
+  <div id="whyBox" class="smallNote mt-2"></div>
+  <div id="countdown" class="countdown"></div>
+
+  <div class="d-grid gap-2 mt-3">
+    <a id="consultBtn" class="btn btnLumora btnPrimary" style="display:none;">
+      Consult Psychiatrist
+    </a>
+
+    <a class="btn btnLumora btnGhost" href="{{ url_for('journals.new_journal') }}">
+      Go to Journaling
+    </a>
+    <a class="btn btnLumora btnGhost" href="{{ url_for('journals.mood_checkin') }}">
+      Mood Check-in
+    </a>
+  </div>
+
+  <div class="smallNote mt-3" id="tipsBox"></div>
+</div>
+
+<!-- RIGHT -->
+<div class="cardX">
+  <h6>Recent signals</h6>
+  <div id="signalsList"></div>
+</div>
+
+</div>
+</div>
+</div>
+
+<script>
+async function loadBurnout(){
+  const res = await fetch("/api/mood/burnout");
+  const data = await res.json();
+
+  pillLevel.textContent = `Level: ${data.level}`;
+
+  statusTitle.textContent = data.burnout ? "🔥 Burnout Risk Detected" : "✅ No Burnout Detected";
+  statusMsg.textContent = data.message;
+  whyBox.innerHTML = `<strong>Why?</strong> ${data.why}`;
+
+  signalsList.innerHTML = data.last_three.map(s => `
+    <div class="signalRow">
+      <div>${s.source} • ${s.raw}</div>
+      <div class="sigTag ${s.is_low ? "tagLow":"tagOk"}">${s.is_low?"LOW":"OK"}</div>
+    </div>
+  `).join("");
+
+  if(data.burnout){
+    statusCard.classList.add("stateBad");
+    consultBtn.style.display="block";
+    consultBtn.href = "{{ url_for('main.psychiatrist_page') }}";
+    tipsBox.textContent = "You don’t have to handle this alone. Professional support can help.";
+
+    if(data.level.toLowerCase()==="high"){
+      let sec=10;
+      countdown.textContent=`Redirecting in ${sec}s…`;
+      const i=setInterval(()=>{
+        sec--; countdown.textContent=`Redirecting in ${sec}s…`;
+        if(sec<=0){ clearInterval(i); location.href=consultBtn.href; }
+      },1000);
+    }
+  }else{
+    statusCard.classList.add("stateGood");
+    tipsBox.textContent="Try breathing, rest, and journaling. Check again tomorrow.";
+  }
+}
+loadBurnout();
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mood Check-in</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg,#f3c8ff,#e7d2ff,#f8eaff);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .checkin-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            position: relative;
+        }
+
+        h2 {
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: #6b2fa1;
+        }
+
+        .mood-options {
+            display: flex;
+            justify-content: space-between;
+            margin: 25px 0;
+        }
+
+        .mood-options label {
+            cursor: pointer;
+            font-size: 2.2rem;
+            transition: transform 0.2s ease;
+            padding: 10px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .mood-options label:hover {
+            transform: scale(1.3);
+            background: rgba(155, 89, 182,0.1);
+        }
+
+        input[type="radio"] {
+            display: none;
+        }
+
+        input[type="radio"]:checked + span {
+            background: linear-gradient(135deg,#9b59b6,#8e44ad);
+            color: white;
+            transform: scale(1.5);
+        }
+
+        .mood-emoji {
+            display: inline-block;
+            padding: 15px;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        button {
+            background: linear-gradient(135deg,#9b59b6,#8e44ad);
+            border: none;
+            color: white;
+            font-weight: 600;
+            padding: 12px 35px;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+
+        .mood-label-text {
+            font-size: 0.85rem;
+            margin-top: 8px;
+            color: #555;
+        }
+
+        .hint {
+            font-size: 0.9rem;
+            color: #8e44ad;
+            margin-top: 15px;
+            font-style: italic;
+        }
+
+        /* Notification styling */
+        #notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            display: none;
+            color: white;
+            z-index: 1050;
+            font-weight: bold;
+            animation: fadein 0.3s ease;
+        }
+
+        @keyframes fadein {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeout {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-20px); }
+        }
+
+        /* Confetti */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #f39c12;
+            opacity: 0.8;
+            pointer-events: none;
+            animation: fall 1.5s linear forwards;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(400px) rotate(720deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="checkin-card">
+    <h2>How are you feeling today?</h2>
+    <form id="moodForm" method="POST" action="{{ url_for('chatbot.mood_checkin') }}">
+        <div class="mood-options">
+            <label>
+                <input type="radio" name="mood" value="5" required>
+                <span class="mood-emoji">😄</span>
+                <div class="mood-label-text">Excellent</div>
+            </label>
+            <label>
+                <input type="radio" name="mood" value="4">
+                <span class="mood-emoji">🙂</span>
+                <div class="mood-label-text">Good</div>
+            </label>
+            <label>
+                <input type="radio" name="mood" value="3">
+                <span class="mood-emoji">😐</span>
+                <div class="mood-label-text">Neutral</div>
+            </label>
+            <label>
+                <input type="radio" name="mood" value="2">
+                <span class="mood-emoji">😔</span>
+                <div class="mood-label-text">Low</div>
+            </label>
+            <label>
+                <input type="radio" name="mood" value="1">
+                <span class="mood-emoji">😭</span>
+                <div class="mood-label-text">Terrible</div>
+            </label>
+        </div>
+        <button type="submit">Submit Mood</button>
+        <div class="hint">Tip: Your daily mood helps track patterns and prevent burnout 💙</div>
+    </form>
+</div>
+
+<!-- Notification container -->
+<div id="notification"></div>
+
+<script>
+    function showNotification(message, type="success") {
+        const notification = document.getElementById("notification");
+        notification.innerText = message;
+        notification.style.background = type === "success" ? "#27ae60" :
+                                        type === "warning" ? "#f39c12" :
+                                        type === "danger" ? "#c0392b" : "#34495e";
+        notification.style.display = "block";
+        notification.style.opacity = 1;
+        setTimeout(() => {
+            notification.style.transition = "opacity 0.5s ease";
+            notification.style.opacity = 0;
+            setTimeout(() => { notification.style.display = "none"; }, 500);
+        }, 2000);
+    }
+
+    function launchConfetti() {
+        const card = document.querySelector('.checkin-card');
+        for(let i=0;i<30;i++){
+            const confetti = document.createElement('div');
+            confetti.classList.add('confetti');
+            confetti.style.backgroundColor = `hsl(${Math.random()*360},70%,60%)`;
+            confetti.style.left = `${Math.random()*90}%`;
+            confetti.style.top = `0px`;
+            confetti.style.width = `${5 + Math.random()*8}px`;
+            confetti.style.height = `${5 + Math.random()*8}px`;
+            confetti.style.animationDuration = `${1 + Math.random()}s`;
+            card.appendChild(confetti);
+            setTimeout(() => confetti.remove(), 1500);
+        }
+    }
+
+    // Handle submission with animation + notification, then redirect
+    const moodForm = document.getElementById('moodForm');
+    moodForm.addEventListener('submit', (e) => {
+        e.preventDefault(); // prevent default immediately
+        const form = e.target;
+        // show confetti + notification
+        showNotification("Mood recorded successfully 💙", "success");
+        launchConfetti();
+
+        // Submit form via JS after short delay (so animation shows)
+        setTimeout(() => {
+            form.submit(); // actual POST to Flask
+        }, 1000); // 1 second delay for animation
+    });
+</script>
+
+</body>
+</html>

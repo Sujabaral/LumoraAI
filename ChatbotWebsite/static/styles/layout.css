@@ -1,0 +1,136 @@
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding-top: 82px; /* space for fixed navbar (desktop) */
+  background: #f5edf9;
+}
+
+/* =========================================================
+   NAVBAR — ALWAYS ABOVE CONTENT
+   ========================================================= */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 9999; /* above cards, comments, forms */
+}
+
+/* Glass effect navbar */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Dropdown must appear over everything */
+.navbar .dropdown-menu {
+  z-index: 10000;
+}
+
+/* Prevent container clipping dropdown */
+.navbar,
+.navbar * {
+  overflow: visible !important;
+}
+
+/* =========================================================
+   NAV LINKS
+   ========================================================= */
+.navbar .navbar-nav .nav-link {
+  transition: 0.2s ease;
+}
+
+/* normal hover */
+.navbar .navbar-nav .nav-link:hover {
+  background-color: #aaeeff;
+  border-radius: 0.375rem;
+}
+
+/* SOS button hover */
+.navbar .navbar-nav .sos:hover {
+  background-color: #ffaaaa;
+  border-radius: 0.375rem;
+}
+
+/* underline hover */
+.nav-link:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   CARDS / MOOD POSTS
+   ========================================================= */
+.burnout-card {
+  border-left: 6px solid #ddd;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+  padding: 18px;
+}
+
+.border-success { border-left-color: #2ecc71 !important; }
+.border-warning { border-left-color: #f39c12 !important; }
+.border-danger  { border-left-color: #e74c3c !important; }
+
+/* =========================================================
+   COMMENT BOX
+   ========================================================= */
+textarea.form-control {
+  border-radius: 10px;
+  resize: none;
+}
+
+button.btn-primary {
+  border-radius: 8px;
+}
+
+/* =========================================================
+   FIX FOR ANCHOR LINKS (no hiding under navbar)
+   ========================================================= */
+html {
+  scroll-padding-top: 90px;
+}
+
+/* =========================================================
+   MOBILE RESPONSIVE FIX
+   ========================================================= */
+@media (max-width: 991px) {
+
+  body {
+    padding-top: 110px; /* taller navbar in mobile */
+  }
+
+  .navbar-collapse {
+    background: rgba(255,255,255,0.95);
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+}
+
+/* =========================================================
+   EXTRA SAFETY — no element can cover navbar
+   ========================================================= */
+/* ✅ DO NOT give container/row/col/form z-index (breaks Bootstrap modals) */
+.card,
+textarea,
+.comment-box {
+  position: relative;
+  z-index: 1;
+}
+/* ✅ Allow only the alert itself to be clickable, not an invisible container */
+#flash-container { pointer-events: none; }
+#flash-container .alert { pointer-events: auto; }
+
+/* ✅ Ensure modal is above everything */
+.modal { z-index: 20000 !important; }
+.modal-backdrop { z-index: 19990 !important; }
+
+/* ✅ Safety: modal should still allow clicks */
+.modal-content { pointer-events: auto; }

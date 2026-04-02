@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container py-4" style="max-width:900px;">
+  <h3 class="fw-bold mb-3">🔔 Notifications</h3>
+
+  {% if notes %}
+    <div class="list-group">
+      {% for n in notes %}
+        <div class="list-group-item">
+          <div class="fw-bold">{{ n.title }}</div>
+          <div class="text-muted small">{{ n.body }}</div>
+          <div class="text-muted small">{{ n.created_at.strftime("%Y-%m-%d %I:%M %p") }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-info">No notifications yet.</div>
+  {% endif %}
+</div>
+{% endblock %}

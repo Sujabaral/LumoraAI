@@ -1,0 +1,152 @@
+{# ChatbotWebsite/templates/checkout.html #}
+{% extends "layout.html" %}
+
+{% block style %}
+<style>
+:root{
+  --lumora-red:#d63031;
+  --lumora-muted:#636e72;
+  --lumora-card:rgba(255,255,255,0.90);
+}
+
+/* page spacing (navbar already exists) */
+.page-wrap{
+  max-width:1120px;
+  margin:0 auto;
+  padding:24px 12px;
+}
+
+/* checkout card */
+.cardx{
+  background: var(--lumora-card);
+  border:1px solid rgba(0,0,0,0.06);
+  border-radius:24px;
+  padding:22px 20px;
+  box-shadow:0 16px 40px rgba(0,0,0,0.14);
+  max-width:560px;
+  width:100%;
+  margin: 24px auto 0;
+}
+
+h3{font-weight:900;margin-bottom:8px;}
+.muted{color:var(--lumora-muted);}
+
+.pill{
+  display:inline-block;
+  padding:7px 12px;
+  border-radius:999px;
+  background: rgba(214,48,49,0.10);
+  border:1px solid rgba(214,48,49,0.20);
+  color: var(--lumora-red);
+  font-weight:900;
+}
+
+.btnx{
+  border-radius:14px;
+  font-weight:900;
+  padding:12px;
+}
+
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border-radius:999px;
+  border:1px solid rgba(0,0,0,0.08);
+  background: rgba(0,0,0,0.04);
+  font-weight:900;
+}
+
+.status-pill.paid{
+  border-color: rgba(46, 204, 113, 0.25);
+  background: rgba(46, 204, 113, 0.12);
+}
+
+.status-pill.pending{
+  border-color: rgba(241, 196, 15, 0.28);
+  background: rgba(241, 196, 15, 0.14);
+}
+</style>
+{% endblock style %}
+
+{% block content %}
+<div class="page-wrap">
+
+  <div class="cardx">
+    <div class="d-flex justify-content-between align-items-start gap-2">
+      <div>
+        <h3>Checkout</h3>
+        <div class="muted">Review your booking details.</div>
+      </div>
+      <div class="pill">NPR {{ booking.amount }}</div>
+    </div>
+
+    <hr>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      {% if booking.paid %}
+        <div class="status-pill paid">✅ Status: PAID</div>
+      {% else %}
+        <div class="status-pill pending">⏳ Status: PENDING</div>
+      {% endif %}
+      <div class="muted" style="font-weight:900;">
+        {{ booking.payment_method|upper }}
+      </div>
+    </div>
+
+    <div class="mb-2"><strong>Psychiatrist:</strong> {{ booking.psychiatrist_name }}</div>
+    <div class="mb-2"><strong>Date:</strong> {{ booking.date }}</div>
+    <div class="mb-2">
+      <strong>Time:</strong> {{ booking.time.strftime("%H:%M") }}
+    </div>
+
+    {% if booking.payment_method == "cash" %}
+      <div class="alert alert-info mt-3">
+        You chose <strong>Cash on Visit</strong>.
+        Please pay NPR {{ booking.amount }} at the clinic/visit.
+      </div>
+
+    {% elif booking.payment_method == "khalti" %}
+      <div class="alert alert-warning mt-3">
+        Khalti demo requires a public URL (ngrok).
+        This is a local demo checkout.
+      </div>
+
+    {% else %}
+      <div class="alert alert-warning mt-3">
+        Payment gateway not connected yet.
+        This is a demo checkout page.
+      </div>
+    {% endif %}
+
+    <div class="d-grid gap-2 mt-3">
+      {% if not booking.paid %}
+        <a class="btn btn-primary btnx"
+           href="{{ url_for('main.mock_mark_paid', booking_id=booking.id) }}">
+          Mark Paid (Test)
+        </a>
+      {% endif %}
+
+      <a class="btn btn-outline-dark btnx"
+         href="{{ url_for('main.psychiatrist_page') }}">
+        Back to booking
+      </a>
+    </div>
+
+    <p class="muted mt-3 mb-0" style="font-size:0.9rem;">
+      Lumora is a final-year demo project.
+      Payment gateways can be integrated later.
+    </p>
+  </div>
+
+</div>
+{% endblock content %}
+
+{% block script %}
+<script>
+  setTimeout(() => {
+    window.location.href = "{{ url_for('main.home') }}";
+  }, 8000);
+</script>
+{% endblock script %}

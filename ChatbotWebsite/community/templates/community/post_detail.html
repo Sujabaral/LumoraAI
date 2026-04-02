@@ -1,0 +1,100 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="container mt-4">
+
+  <a href="{{ url_for('community.feed') }}">&larr; Back</a>
+
+  <div class="card p-3 mt-2">
+    <h4>{{ post.title }}</h4>
+    <small class="text-muted">{{ post.anon_alias }} • {{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+
+    {% if post.status == 'under_review' %}
+      <span class="badge bg-warning text-dark ms-2">under review</span>
+    {% endif %}
+
+    <p class="mt-3">{{ post.body }}</p>
+
+    {% if tags %}
+      <div class="mt-2">
+        {% for t in tags %}
+          <span class="badge bg-light text-dark border">{{ t }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="mt-3 d-flex gap-2">
+      <button class="btn btn-outline-success btn-sm react-btn" data-type="support">
+        Support ({{ counts.support }})
+      </button>
+      <button class="btn btn-outline-secondary btn-sm react-btn" data-type="relate">
+        Relate ({{ counts.relate }})
+      </button>
+      <button class="btn btn-outline-danger btn-sm react-btn" data-type="heart">
+        Heart ({{ counts.heart }})
+      </button>
+    </div>
+
+    <div class="mt-3">
+      <button class="btn btn-sm btn-outline-warning" onclick="reportPost()">Report</button>
+    </div>
+  </div>
+
+  <div class="card p-3 mt-3">
+    <form method="POST" action="{{ url_for('community.add_comment', id=post.id) }}">
+      <textarea class="form-control mb-2" name="body" rows="3" placeholder="Comment anonymously..." required></textarea>
+      <button class="btn btn-primary btn-sm">Add Comment</button>
+    </form>
+  </div>
+
+  <h5 class="mt-4">Comments</h5>
+  {% for c in comments %}
+    <div class="card p-3 mt-2">
+      <small class="text-muted">{{ c.anon_alias }} • {{ c.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+      {% if c.status == 'under_review' %}
+        <span class="badge bg-warning text-dark ms-2">under review</span>
+      {% endif %}
+      <p class="mt-2 mb-2">{{ c.body }}</p>
+      <button class="btn btn-sm btn-outline-warning" onclick="reportComment({{ c.id }})">Report</button>
+    </div>
+  {% endfor %}
+
+</div>
+
+<script>
+async function postForm(url, data) {
+  const fd = new FormData();
+  Object.keys(data).forEach(k => fd.append(k, data[k]));
+  const res = await fetch(url, { method: "POST", body: fd });
+  return res.json();
+}
+
+document.querySelectorAll(".react-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const type = btn.dataset.type;
+    const result = await postForm("{{ url_for('community.react', id=post.id) }}", { type });
+    if (!result.ok) alert(result.message || "Failed");
+    else location.reload();
+  });
+});
+
+async function reportPost() {
+  const reason = prompt("Why are you reporting this post? (spam/harassment/PII/self-harm/etc)");
+  if (!reason) return;
+  const result = await postForm("{{ url_for('community.report') }}", {
+    post_id: "{{ post.id }}",
+    reason: reason
+  });
+  alert(result.message || "Reported");
+}
+
+async function reportComment(commentId) {
+  const reason = prompt("Why are you reporting this comment?");
+  if (!reason) return;
+  const result = await postForm("{{ url_for('community.report') }}", {
+    comment_id: commentId,
+    reason: reason
+  });
+  alert(result.message || "Reported");
+}
+</script>
+{% endblock %}

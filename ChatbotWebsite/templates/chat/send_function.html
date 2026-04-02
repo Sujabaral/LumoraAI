@@ -1,0 +1,818 @@
+<!-- ChatbotWebsite/templates/chat/send_function.html -->
+<script>
+(function () {
+  "use strict";
+
+  // ✅ Flask-generated URLs (avoids hardcoded paths / blueprint issues)
+  const URLS = {
+    chat_messages: "{{ url_for('chatbot.chatting') }}",
+    test: "{{ url_for('chatbot.test') }}",
+    score: "{{ url_for('chatbot.score') }}",
+    mindfulness_get_audio: "{{ url_for('chatbot.mindfulness_get_audio') }}",
+    sos: "{{ url_for('main.sos') }}",
+  };
+
+  // ---------------- CSRF ----------------
+  function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
+  }
+
+  // ---------------- Language (Nepali auto-detect) ----------------
+  function detectLang(userText) {
+    return /[\u0900-\u097F]/.test(userText || "") ? "ne" : "en";
+  }
+
+  // ---------------- Mindfulness intent helpers ----------------
+  function wantsMeditation(userText) {
+    const t = (userText || "").toLowerCase().trim();
+    const explicit = [
+      "meditation","meditate","mindfulness","guided meditation",
+      "play meditation","start meditation","play audio","audio please",
+      "breathing exercise","play breathing","play breathing retraining",
+      "breathing retraining","body scan","mountain meditation","rain and thunder"
+    ];
+    return explicit.some((k) => t === k || t.includes(k));
+  }
+
+  function shouldOfferMindfulness(userText) {
+    const t = (userText || "").toLowerCase();
+    return (
+      t.includes("stress") || t.includes("stressed") ||
+      t.includes("anxious") || t.includes("anxiety") ||
+      t.includes("panic") || t.includes("overwhelmed") ||
+      t.includes("can't sleep") || t.includes("cant sleep") ||
+      t.includes("insomnia") || t.includes("sleep")
+    );
+  }
+
+  function selectMindfulnessByText(userText) {
+    const t = (userText || "").toLowerCase();
+    if (t.includes("anxious") || t.includes("panic") || t.includes("stress") || t.includes("breathing")) {
+      return "Breathing Retraining (10:45)";
+    }
+    if (t.includes("sad") || t.includes("low") || t.includes("depressed") || t.includes("tired") || t.includes("body scan")) {
+      return "Body Scan Meditation (10:00)";
+    }
+    if (t.includes("overwhelmed") || t.includes("lost") || t.includes("confused") || t.includes("mountain")) {
+      return "Mountain Meditation (8:12)";
+    }
+    if (t.includes("sleep") || t.includes("insomnia") || t.includes("night") || t.includes("rain")) {
+      return "Rain and Thunder Sounds (10:00)";
+    }
+    return null;
+  }
+
+  function selectMindfulnessBySentiment(score) {
+    if (score === null || score === undefined || Number.isNaN(Number(score))) return null;
+    const s = Number(score);
+    const normalized = (s >= 0 && s <= 1) ? (s * 2 - 1) : s;
+    if (normalized <= -0.4) return "Body Scan Meditation (10:00)";
+    if (normalized <= -0.1) return "Mountain Meditation (8:12)";
+    return "Breathing Retraining (10:45)";
+  }
+
+  // ---------------- Basic helpers ----------------
+  function escapeHTML(str) {
+    return String(str ?? "").replace(/[&<>"']/g, (m) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+    }[m]));
+  }
+
+  function nl2brSafe(str) {
+    return escapeHTML(str ?? "").replace(/\n/g, "<br>");
+  }
+
+  function formatTime(date) {
+    const h = ("0" + date.getHours()).slice(-2);
+    const m = ("0" + date.getMinutes()).slice(-2);
+    return `${h}:${m}`;
+  }
+
+  function scrollToBottom(container) {
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function postJSON(url, payload) {
+    const csrf = getCSRFToken();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(csrf ? { "X-CSRFToken": csrf } : {}),
+      },
+      body: JSON.stringify(payload || {}),
+    });
+    return res;
+  }
+
+  // ---------------- Minimal custom modal (Safety Check) ----------------
+  function ensureConfirmModal() {
+    if (document.getElementById("lumoraConfirmModal")) return;
+
+    const modalHTML = `
+      <div id="lumoraConfirmModal" class="lumora-modal-backdrop" style="display:none;">
+        <div class="lumora-modal">
+          <div class="lumora-modal-header">
+            <div class="lumora-modal-title">Safety Check</div>
+            <button type="button" class="lumora-modal-close" id="lumoraConfirmClose">×</button>
+          </div>
+          <div class="lumora-modal-body">
+            <p id="lumoraConfirmText" style="margin:0;"></p>
+          </div>
+          <div class="lumora-modal-footer">
+            <button type="button" class="btn btn-danger btn-sm fw-bold" id="lumoraConfirmYes">Yes</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" id="lumoraConfirmNo">No</button>
+          </div>
+          <small class="text-muted d-block mt-2">
+            If you feel unsafe at any time, use the SOS button.
+          </small>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML("beforeend", modalHTML);
+
+    const style = document.createElement("style");
+    style.textContent = `
+      .lumora-modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,0.35);
+        display:flex; align-items:center; justify-content:center; z-index:9999; padding:18px;}
+      .lumora-modal{width:min(520px,100%); background:#fff; border-radius:14px; padding:14px;
+        box-shadow:0 18px 45px rgba(0,0,0,0.22);}
+      .lumora-modal-header{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;}
+      .lumora-modal-title{font-weight:800; font-size:18px;}
+      .lumora-modal-close{border:0; background:transparent; font-size:24px; line-height:1; cursor:pointer;}
+      .lumora-modal-footer{display:flex; gap:10px; justify-content:flex-end; margin-top:12px;}
+    `;
+    document.head.appendChild(style);
+
+    function hide() {
+      const m = document.getElementById("lumoraConfirmModal");
+      if (m) m.style.display = "none";
+    }
+
+    document.getElementById("lumoraConfirmClose").addEventListener("click", hide);
+    document.getElementById("lumoraConfirmNo").addEventListener("click", hide);
+    document.getElementById("lumoraConfirmModal").addEventListener("click", (e) => {
+      if (e.target && e.target.id === "lumoraConfirmModal") hide();
+    });
+  }
+
+  function showConfirmModal(promptText, yesUrl) {
+    ensureConfirmModal();
+    const m = document.getElementById("lumoraConfirmModal");
+    const t = document.getElementById("lumoraConfirmText");
+    let yesBtn = document.getElementById("lumoraConfirmYes");
+
+    t.textContent = promptText || "Are you in immediate danger right now?";
+    m.style.display = "flex";
+
+    const newYes = yesBtn.cloneNode(true);
+    yesBtn.parentNode.replaceChild(newYes, yesBtn);
+
+    newYes.addEventListener("click", () => {
+      window.location.href = yesUrl || "/sos";
+    });
+  }
+
+  // ---------------- Tests (modal) ----------------
+  function ensureTestModal() {
+    if (document.getElementById("lumoraTestModal")) return;
+
+    const modal = document.createElement("div");
+    modal.id = "lumoraTestModal";
+    modal.style.cssText = "position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.55); z-index:99999; padding:16px;";
+
+    modal.innerHTML = `
+      <div style="width:min(720px, 100%); background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.25); overflow:hidden;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid #eee;">
+          <div>
+            <div id="lumoraTestTitle" style="font-weight:700; font-size:16px;">Test</div>
+            <div id="lumoraTestSub" style="font-size:12px; color:#666; margin-top:2px;">Answer all questions</div>
+          </div>
+          <button id="lumoraTestClose" type="button" style="border:none; background:transparent; font-size:22px; line-height:1; cursor:pointer;">×</button>
+        </div>
+
+        <div id="lumoraTestBody" style="padding:16px; max-height:70vh; overflow:auto;"></div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; padding:12px 16px; border-top:1px solid #eee;">
+          <button id="lumoraTestCancel" type="button" style="padding:10px 14px; border-radius:10px; border:1px solid #ddd; background:#fff; cursor:pointer;">Cancel</button>
+          <button id="lumoraTestSubmit" type="button" style="padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer;">Submit</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    function hide() { modal.style.display = "none"; }
+
+    modal.addEventListener("click", (e) => { if (e.target === modal) hide(); });
+    document.getElementById("lumoraTestClose").addEventListener("click", hide);
+    document.getElementById("lumoraTestCancel").addEventListener("click", hide);
+  }
+
+  function normalizeQuestions(raw) {
+    // supports: ["q1","q2"] or [{question:"", options:[...]}]
+    if (!Array.isArray(raw)) return [];
+    return raw.map((q) => {
+      if (typeof q === "string") return { question: q, options: null };
+      if (q && typeof q === "object") return { question: q.question || q.text || String(q.q || ""), options: q.options || null };
+      return { question: String(q), options: null };
+    }).filter((x) => x.question);
+  }
+
+  function defaultOptionsForTest(title) {
+    // PHQ-9 / GAD-7 style options (0-3)
+    return [
+      { label: "Not at all", value: 0 },
+      { label: "Several days", value: 1 },
+      { label: "More than half the days", value: 2 },
+      { label: "Nearly every day", value: 3 },
+    ];
+  }
+
+  function openTestModal(title, questionsRaw) {
+    ensureTestModal();
+
+    const modal = document.getElementById("lumoraTestModal");
+    const body = document.getElementById("lumoraTestBody");
+    const titleEl = document.getElementById("lumoraTestTitle");
+    const subEl = document.getElementById("lumoraTestSub");
+    const submitBtn = document.getElementById("lumoraTestSubmit");
+
+    const questions = normalizeQuestions(questionsRaw);
+    titleEl.textContent = title || "Self Test";
+    subEl.textContent = `Questions: ${questions.length}`;
+
+    body.innerHTML = "";
+
+    if (questions.length === 0) {
+      body.innerHTML = `<div style="color:#b00; font-weight:600;">No questions found.</div>`;
+      modal.style.display = "flex";
+      return;
+    }
+
+    const optDefault = defaultOptionsForTest(title);
+    const form = document.createElement("div");
+    form.id = "lumoraTestForm";
+
+    questions.forEach((q, idx) => {
+      const card = document.createElement("div");
+      card.style.cssText = "border:1px solid #eee; border-radius:12px; padding:12px; margin-bottom:12px;";
+
+      const qText = document.createElement("div");
+      qText.style.cssText = "font-weight:700; margin-bottom:8px;";
+      qText.textContent = `${idx + 1}. ${q.question}`;
+      card.appendChild(qText);
+
+      const opts = Array.isArray(q.options) && q.options.length
+        ? q.options.map((o, i) => ({ label: String(o.label ?? o.text ?? o), value: Number(o.value ?? i) }))
+        : optDefault;
+
+      opts.forEach((opt) => {
+        const row = document.createElement("label");
+        row.style.cssText = "display:flex; gap:10px; align-items:center; padding:6px 2px; cursor:pointer;";
+        row.innerHTML = `
+          <input type="radio" name="q_${idx}" value="${opt.value}" style="transform:scale(1.1);" />
+          <span>${opt.label}</span>
+        `;
+        card.appendChild(row);
+      });
+
+      form.appendChild(card);
+    });
+
+    body.appendChild(form);
+
+    // submit handler (replace listener each open)
+    const newBtn = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+
+    newBtn.addEventListener("click", async () => {
+      // compute score
+      let total = 0;
+      for (let i = 0; i < questions.length; i++) {
+        const picked = document.querySelector(`input[name="q_${i}"]:checked`);
+        if (!picked) {
+          alert("Please answer all questions before submitting.");
+          return;
+        }
+        total += Number(picked.value || 0);
+      }
+
+      // close test modal first
+      modal.style.display = "none";
+
+      try {
+        const res = await postJSON(URLS.score, { title: title, score: total });
+        const data = await res.json().catch(() => ({}));
+
+        // ✅ Always show score + interpretation in chat
+        const scoreMsg = (data && data.score_message) ? String(data.score_message) : "";
+        const msg = scoreMsg
+          ? `✅ ${title} Result — Score: ${total}\n${scoreMsg}`
+          : `✅ ${title} Result — Score: ${total}.`;
+
+        (window.__lumoraAddBotMessage || function(t){console.warn("bot printer not ready:", t);})(msg);
+
+        // ✅ Trigger safety modal if needed
+        if (data && data.need_confirm) {
+          showConfirmModal(
+            data.confirm_prompt || "Are you in immediate danger right now?",
+            data.confirm_yes_url || URLS.sos
+          );
+        }
+      } catch (e) {
+        console.error("score submit failed", e);
+        (window.__lumoraAddBotMessage || function(t){console.warn("bot printer not ready:", t);})(`✅ ${title} Result — Score: ${total}. (Could not fetch interpretation right now.)`);
+      }
+    });
+
+    modal.style.display = "flex";
+  }
+
+  // exposed for existing calls
+  window.appendTest = function (_botName, _botImg, _side, questions, title) {
+    openTestModal(title, questions);
+  };
+
+  // ---------------- DOM READY ----------------
+  document.addEventListener("DOMContentLoaded", function () {
+    console.log("✅ send_function loaded");
+
+    const msgerChat = document.querySelector("#main-chat");
+    const formEl = document.getElementById("message-form");
+    const inputEl = document.getElementById("textInput");
+
+    if (!msgerChat || !formEl || !inputEl) {
+      console.error("❌ Chat DOM not found. Need #main-chat, #message-form, #textInput", {
+        msgerChat, formEl, inputEl
+      });
+      return;
+    }
+
+    const BOT_IMG = "/static/images/logo.png";
+    const BOT_NAME = "LUMORA";
+    const USER_NAME = "You";
+    const IS_GUEST = (formEl.dataset.isGuest === "1");
+
+    // user img
+    const image_file = formEl.getAttribute("image_file") || "default.jpg";
+    const USER_IMG = "/static/profile_images/" + image_file;
+
+    // session tracking
+    let ACTIVE_SESSION_ID = formEl.dataset.sessionId ? String(formEl.dataset.sessionId) : "";
+
+    if (IS_GUEST) {
+      ACTIVE_SESSION_ID = "guest_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+      formEl.dataset.sessionId = ACTIVE_SESSION_ID;
+      console.log("🆕 Guest ephemeral session:", ACTIVE_SESSION_ID);
+    } else {
+      console.log("✅ Logged-in session (server-provided):", ACTIVE_SESSION_ID);
+    }
+
+    // typing state
+    let isBotTyping = false;
+    let typingInterval = null;
+    let topicSequence = null;
+
+    // mindfulness state
+    let lastUserSentimentScore = null;
+    let lastUserSentimentLabel = null;
+    let currentlyPlayingAudio = null;
+
+    function stopBotTyping() {
+      if (isBotTyping && typingInterval) clearInterval(typingInterval);
+      isBotTyping = false;
+      typingInterval = null;
+    }
+
+    function stopTopicSequence() {
+      if (topicSequence) {
+        clearInterval(topicSequence);
+        topicSequence = null;
+      }
+    }
+
+    function stopAnyMindfulnessAudio() {
+      try {
+        if (currentlyPlayingAudio) {
+          currentlyPlayingAudio.pause();
+          currentlyPlayingAudio.currentTime = 0;
+          currentlyPlayingAudio = null;
+        }
+        const audio = document.getElementById("mindfulnessAudio");
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      } catch (e) {
+        console.warn("Audio stop error:", e);
+      }
+    }
+
+    // ✅ Mindfulness Player handler (important)
+    function handleMindfulness(actions){
+      if(!actions || !actions.audio_url) return;
+
+      const box   = document.getElementById("mindfulnessPlayer");
+      const audio = document.getElementById("mindfulnessAudio");
+      const srcEl = document.getElementById("mindfulnessSource");
+      const title = document.getElementById("mindfulnessTitle");
+      const desc  = document.getElementById("mindfulnessDesc");
+
+      if(!box || !audio){
+        console.error("Mindfulness player elements not found.");
+        return;
+      }
+
+      // Track whether the user manually paused (so we don't fight the pause button)
+      if (!audio.dataset.pauseBind) {
+        window.__mindfulnessUserPaused = false;
+
+        audio.addEventListener("pause", () => { window.__mindfulnessUserPaused = true; });
+        audio.addEventListener("play",  () => { window.__mindfulnessUserPaused = false; });
+
+        // Prevent clicks on controls from bubbling to container (which could restart playback)
+        audio.addEventListener("click", (e) => e.stopPropagation());
+
+        audio.dataset.pauseBind = "1";
+      }
+
+      if(title) title.textContent = actions.audio_title || actions.title || "Mindfulness Audio";
+      if(desc)  desc.textContent  = actions.audio_desc  || (actions.duration ? ("Duration: " + actions.duration) : "");
+
+      audio.preload = "auto";
+      audio.src = actions.audio_url;
+      if (srcEl) srcEl.src = actions.audio_url;
+
+      // Only autoplay when the source loads AND the user hasn't manually paused
+      audio.oncanplay = () => {
+        if (!window.__mindfulnessUserPaused) {
+          audio.play().catch((e)=>console.log("Autoplay blocked:", e));
+        }
+      };
+
+      audio.load();
+      box.style.display = "block";
+
+      // If user clicks empty area of the box (not controls), resume
+      if (!box.dataset.clickBind) {
+        box.addEventListener("click", (e) => {
+          if (e.target === box && audio.paused) {
+            audio.play().catch(()=>{});
+          }
+        });
+        box.dataset.clickBind = "1";
+      }
+    }
+
+    // ---------------- Append messages ----------------
+    function appendMessage(name, img, side, text, timeOverride) {
+      const timeStr = timeOverride || formatTime(new Date());
+      const msgHTML = `
+        <div class="chat ${side}-msg">
+          <img src="${img}" class="chat-image" />
+          <div class="chat-bubble">
+            <div class="chat-info">
+              <div class="chat-info-name">${escapeHTML(name)}</div>
+              <div class="chat-info-time">${escapeHTML(timeStr)}</div>
+            </div>
+            <div class="chat-text">${nl2brSafe(text)}</div>
+          </div>
+        </div>`;
+      msgerChat.insertAdjacentHTML("beforeend", msgHTML);
+      scrollToBottom(msgerChat);
+    }
+
+    // ---------------- Bot message (typing + crisis + save) ----------------
+    function addBotMessage(text, isCrisis = false, actions = null, saveMeta = null) {
+      stopBotTyping();
+
+      let bubbleClass = "chat-bubble";
+      if (isCrisis) bubbleClass += " crisis-bubble";
+
+      const messageHTML = `
+        <div class="chat left-msg">
+          <img src="${BOT_IMG}" class="chat-image" />
+          <div class="${bubbleClass}">
+            <div class="chat-info">
+              <div class="chat-info-name">${escapeHTML(isCrisis ? (BOT_NAME + " (Crisis Support)") : BOT_NAME)}</div>
+              <div class="chat-info-time">${escapeHTML(formatTime(new Date()))}</div>
+            </div>
+            <div class="chat-text ${isCrisis ? "crisis-text" : ""}"></div>
+            <div class="bot-actions mt-2" style="display:none;"></div>
+            <div class="crisis-actions mt-2" style="display:none;"></div>
+          </div>
+        </div>`;
+
+      msgerChat.insertAdjacentHTML("beforeend", messageHTML);
+
+      const lastMsg = msgerChat.querySelector(".left-msg:last-child");
+      const textDiv = lastMsg.querySelector(".chat-text");
+      const actionsDiv = lastMsg.querySelector(".crisis-actions");
+      const botActionsDiv = lastMsg.querySelector(".bot-actions");
+
+      if (isCrisis) {
+        textDiv.innerHTML = nl2brSafe(text || "");
+
+        if (actions && (actions.sos_url || actions.consult_url)) {
+          const sos = actions.sos_url || "/sos";
+          const consult = actions.consult_url || "#";
+
+          actionsDiv.style.display = "flex";
+          actionsDiv.style.gap = "10px";
+          actionsDiv.style.flexWrap = "wrap";
+          actionsDiv.innerHTML = `
+            <a href="${sos}" class="btn btn-danger btn-sm fw-bold">SOS 🚨</a>
+            <a href="${consult}" class="btn btn-outline-dark btn-sm fw-bold">🩺 Consultation</a>
+          `;
+        }
+
+        scrollToBottom(msgerChat);
+        return;
+      }
+
+      const plain = String(text || "");
+      let index = 0;
+      isBotTyping = true;
+
+      typingInterval = setInterval(() => {
+        if (index < plain.length) {
+          textDiv.innerHTML += escapeHTML(plain.charAt(index));
+          index++;
+          scrollToBottom(msgerChat);
+        } else {
+          clearInterval(typingInterval);
+          isBotTyping = false;
+          typingInterval = null;
+
+          if (!IS_GUEST && saveMeta && saveMeta.allow_save && saveMeta.bot_message_id) {
+            botActionsDiv.style.display = "flex";
+            botActionsDiv.style.gap = "10px";
+            botActionsDiv.style.flexWrap = "wrap";
+
+            botActionsDiv.innerHTML = `
+              <button class="btn btn-outline-secondary btn-sm save-insight-btn"
+                      data-message-id="${saveMeta.bot_message_id}">
+                💡 Save
+              </button>
+            `;
+          }
+        }
+      }, 12);
+    }
+
+    // ✅ expose bot message printer globally (so test modal can print into chat)
+    window.__lumoraAddBotMessage = function (text, isCrisis=false, actions=null, saveMeta=null) {
+      try {
+        addBotMessage(text, isCrisis, actions, saveMeta);
+      } catch (e) {
+        console.warn("addBotMessage failed, fallback to appendMessage:", e);
+        appendMessage(BOT_NAME, BOT_IMG, "left", String(text || ""));
+      }
+    };
+
+    // ---------------- SOS auto-redirect (high risk only) ----------------
+    function handleCrisisRedirect(data) {
+      if (!data) return false;
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+        return true;
+      }
+      if (data.redirect_sos && data.risk_level === "high") {
+        window.location.href = "/sos";
+        return true;
+      }
+      if (data.crisis && data.actions && data.actions.sos_url) {
+        window.location.href = data.actions.sos_url;
+        return true;
+      }
+      return false;
+    }
+
+    // ---------------- Send to backend ----------------
+    async function sendToBackend(userMsg) {
+      const payload = { msg: userMsg, lang: detectLang(userMsg) };
+      if (!IS_GUEST) payload.session_id = ACTIVE_SESSION_ID || "";
+      else payload.is_guest = 1;
+
+      const res = await postJSON(URLS.chat_messages, payload);
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error("chat_messages HTTP " + res.status + " " + txt);
+      }
+      return await res.json();
+    }
+
+    // ---------------- Save Insight (event delegation) ----------------
+    document.addEventListener("click", async function (e) {
+      const btn = e.target.closest(".save-insight-btn");
+      if (!btn) return;
+
+      if (IS_GUEST) {
+        alert("Please login to save insights.");
+        return;
+      }
+
+      const msgId = btn.getAttribute("data-message-id");
+      if (!msgId) return;
+
+      btn.disabled = true;
+
+      try {
+        const res = await postJSON("/save_insight", { message_id: parseInt(msgId, 10) });
+        const data = await res.json().catch(() => ({}));
+
+        if (data && (data.ok || data.id)) {
+          btn.textContent = "Saved ✓";
+          btn.classList.add("disabled");
+        } else {
+          btn.disabled = false;
+          alert((data && data.error) || "Could not save.");
+        }
+      } catch (err) {
+        console.error("save_insight failed", err);
+        btn.disabled = false;
+        alert("Could not save. Please try again.");
+      }
+    });
+
+    // ---------------- Form submit ----------------
+    formEl.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      stopBotTyping();
+      stopTopicSequence();
+
+      const userMsg = (inputEl.value || "").trim();
+      if (!userMsg) return;
+
+      appendMessage(USER_NAME, USER_IMG, "right", userMsg);
+      inputEl.value = "";
+
+      try {
+        const data = await sendToBackend(userMsg);
+
+        let responseText = (data.msg || data.reply || data.response || "").trim();
+        const isCrisis = !!data.crisis;
+        const actions = data.actions || null;
+
+        // ✅ Mindfulness audio-only: no bot text bubble
+        const isMindfulness = (data && data.meta && data.meta.type === "mindfulness");
+        if (isMindfulness && actions && actions.audio_url) {
+          handleMindfulness(actions);
+          return;
+        }
+
+        if (!responseText) responseText = "I’m here with you. Can you tell me a bit more?";
+
+        // store sentiment info if provided
+        lastUserSentimentScore =
+          (data?.sentiment?.user?.final_score) ?? (data?.meta?.sentiment_final_score) ?? null;
+        lastUserSentimentLabel =
+          (data?.sentiment?.user?.label) ?? (data?.meta?.sentiment_label) ?? null;
+
+        // update session id if backend returns one
+        if (!IS_GUEST && data.session_id) {
+          ACTIVE_SESSION_ID = String(data.session_id);
+          formEl.dataset.sessionId = ACTIVE_SESSION_ID;
+        }
+
+        if (handleCrisisRedirect(data)) return;
+
+        (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})(responseText, isCrisis, actions, {
+          allow_save: !!data.allow_save,
+          bot_message_id: data.bot_message_id
+        });
+
+        if (data && data.need_confirm) {
+          showConfirmModal(
+            data.confirm_prompt || "Are you in immediate danger right now?",
+            data.confirm_yes_url || "/sos"
+          );
+        }
+
+        if (!isCrisis && !wantsMeditation(userMsg) && shouldOfferMindfulness(userMsg)) {
+          (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})("If you want, I can guide a short breathing exercise. Type **play breathing** or choose one from **Mindfulness**.");
+        }
+
+        if (!isCrisis && wantsMeditation(userMsg)) {
+          setTimeout(() => {
+            stopAnyMindfulnessAudio();
+
+            let chosen = selectMindfulnessByText(userMsg);
+            if (!chosen) chosen = selectMindfulnessBySentiment(lastUserSentimentScore);
+
+            if (chosen) {
+              (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})("Okay — I’ll play a mindfulness exercise now.");
+              window.responseExercise(chosen);
+            }
+          }, 250);
+        }
+
+      } catch (err) {
+        console.error("❌ chat_messages failed", err);
+        (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})("Sorry—something went wrong sending that. Please try again.", false);
+      }
+    });
+
+    // ---------------- Dropdown functions ----------------
+    window.responseTopic = async function (title) {
+      stopBotTyping();
+      stopTopicSequence();
+
+      const t = String(title || "").trim();
+      if (!t) return;
+
+      appendMessage(USER_NAME, USER_IMG, "right", t);
+
+      try {
+        const res = await postJSON("/topic", { title: t });
+        const data = await res.json().catch(() => ({}));
+        const messages = data.contents || [];
+
+        if (!Array.isArray(messages) || messages.length === 0) {
+          (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})("No content found for that topic.");
+          return;
+        }
+
+        if (messages.length === 1) {
+          (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})(messages[0]);
+          return;
+        }
+
+        let index = 0;
+        topicSequence = setInterval(() => {
+          if (isBotTyping) return;
+          if (index < messages.length) {
+            (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})(messages[index]);
+            index++;
+          } else {
+            clearInterval(topicSequence);
+            topicSequence = null;
+          }
+        }, 2200);
+
+      } catch (e) {
+        (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})("Sorry, topic loading failed. Please try again.");
+      }
+    };
+
+    window.responseTest = async function (title) {
+      stopBotTyping();
+      stopTopicSequence();
+
+      const t = String(title || "").trim();
+      if (!t) return;
+
+      appendMessage(USER_NAME, USER_IMG, "right", t);
+
+      try {
+        const res = await postJSON(URLS.test, { title: t });
+        const data = await res.json().catch(() => ({}));
+        const questions = data.questions || [];
+
+        if (!Array.isArray(questions) || questions.length === 0) {
+          (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})("No questions found for this test.");
+          return;
+        }
+
+        window.appendTest(BOT_NAME, BOT_IMG, "left", questions, t);
+      } catch (e) {
+        (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})("Sorry, test loading failed. Please try again.");
+      }
+    };
+
+    // ✅ Mindfulness dropdown -> backend -> handleMindfulness()
+    window.responseExercise = async function (title) {
+      stopBotTyping();
+      stopTopicSequence();
+
+      const t = String(title || "").trim();
+      if (!t) return;
+
+      appendMessage(USER_NAME, USER_IMG, "right", t);
+
+      try {
+        const res = await postJSON(URLS.mindfulness_get_audio, { title: t });
+        const data = await res.json().catch(() => ({}));
+
+        if (data && data.ok && data.actions && data.actions.audio_url) {
+          handleMindfulness(data.actions);
+          return;
+        }
+
+        (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})(data.error || "Audio not available for this exercise.");
+      } catch (e) {
+        console.error("responseExercise failed", e);
+        (window.__lumoraAddBotMessage || function(t){console.warn("addBotMessage not ready:", t);})("Sorry, mindfulness loading failed. Please try again.");
+      }
+    };
+
+  }); // DOMContentLoaded end
+
+  // ✅ expose modal openers for navbar/onclick usage
+  window.openTestModal = openTestModal;
+  if (typeof openMindfulnessModal === 'function') window.openMindfulnessModal = openMindfulnessModal;
+  if (typeof openConfirmModal === 'function') window.openConfirmModal = openConfirmModal;
+})(); // IIFE end
+</script>
