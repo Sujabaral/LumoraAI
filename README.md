@@ -323,4 +323,4 @@ Suja Baral
 ## 📄 License
 
 This project was developed for educational purpose.
->>>>>>> 2f40be4 (Added README with screenshots)
+
